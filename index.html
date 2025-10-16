@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ANALYZER - v2.3.2 (Konami Fix)</title>
+    <title>ANALYZER - v2.3.2 (Storage Fix)</title>
     <style>
         :root {
             --color-background-primary: #08080A; --color-element-primary: #141414; --color-funckey-primary: #2A2A2A;
@@ -445,7 +445,7 @@
             const storage = {
                 loadProfiles: () => { try { const d = localStorage.getItem('analyzer:profiles'); return d ? JSON.parse(d) : []; } catch(e) { return []; } },
                 saveProfiles: (profiles) => { try { localStorage.setItem('analyzer:profiles', JSON.stringify(profiles)); } catch(e) {} },
-                saveProfile: (name) => { const profiles = storage.loadProfiles(); if (!profiles.includes(name)) { profiles.push(name); storage.saveProfiles(profiles); } },
+                saveProfile: (name) => { try { const profiles = storage.loadProfiles(); if (!profiles.includes(name)) { profiles.push(name); storage.saveProfiles(profiles); } } catch(e) { console.error("Could not save profile:", e); } },
                 deleteProfile: (name) => { let profiles = storage.loadProfiles(); profiles = profiles.filter(p => p !== name); storage.saveProfiles(profiles); localStorage.removeItem(`analyzer:playerData:${name}`); ['OPEN_FIELD'].forEach(mode => { for (let i=1; i<=18; i++) { localStorage.removeItem(`analyzer:level_done:${mode}:${i}:${name}`); localStorage.removeItem(`analyzer:highscore:${mode}:${i}:${name}`); } }); },
                 loadPlayerData: (name) => { try { const d = localStorage.getItem(`analyzer:playerData:${name}`); const data = d ? JSON.parse(d) : { totalPoints: 0, inventory: {}, stats: {}, achievements: {} }; if (!data.inventory) data.inventory = {}; if (!data.stats) data.stats = { timePlayed: 0, levelsCompleted_OPEN_FIELD: 0 }; if (!data.achievements) data.achievements = {}; return data; } catch(e) { return { totalPoints: 0, inventory: {}, stats: {}, achievements: {} }; } },
                 savePlayerData: (name, data) => { try { localStorage.setItem(`analyzer:playerData:${name}`, JSON.stringify(data)); } catch(e) {} },
