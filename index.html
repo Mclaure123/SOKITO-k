@@ -1,1780 +1,1500 @@
-"<!DOCTYPE html>
-<html lang=\"es\">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset=\"UTF-8\">
-    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-    <title>Misión Supermercado v4.0 - Mejorado</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>ANALYZER - v2.3.2 (Konami Fix)</title>
     <style>
-        /* ============================================
-           MEJORA VISUAL #1: Esquema de colores moderno
-           ============================================ */
         :root {
-            --color-primary: #00f6ff;
-            --color-primary-dark: #00d1d9;
-            --color-primary-glow: rgba(0, 246, 255, 0.3);
-            --color-secondary: #7b2cbf;
-            --color-success: #06ffa5;
-            --color-danger: #ff006e;
-            --color-warning: #ffbe0b;
-            --color-bg: #0a0e27;
-            --color-bg-lighter: #1a1f3a;
-            --color-text: #e0e6ff;
-            --color-text-dim: #8b95c9;
-            --color-border: rgba(0, 246, 255, 0.2);
-            --gradient-primary: linear-gradient(135deg, #00f6ff 0%, #00d1d9 100%);
-            --gradient-secondary: linear-gradient(135deg, #7b2cbf 0%, #5a189a 100%);
-            --gradient-bg: linear-gradient(180deg, #0a0e27 0%, #151934 100%);
+            --color-background-primary: #08080A; --color-element-primary: #141414; --color-funckey-primary: #2A2A2A;
+            --color-text-passive: #B0B4C0; --color-text-active: #FFFFFF; --color-accent-primary: #00FFFF;
+            --color-accent-bios: #00FF8A; --color-accent-error: #FF414B; --font-family: 'Consolas', 'Menlo', 'Courier New', monospace;
+            --transition-speed: 220ms;
         }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; width: 100%; overflow: hidden; background-color: var(--color-background-primary); color: var(--color-text-passive); font-family: var(--font-family); }
+        body { display: flex; justify-content: center; align-items: center; background-color: #000; }
+        
+        #matrix-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 0; }
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        .scanlines { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; background: linear-gradient(to bottom, rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%); background-size: 100% 4px; z-index: 1000; }
+        .window { 
+            display: none; flex-direction: column; justify-content: center; align-items: center; 
+            width: 100%; height: 100%; padding: 2vw; animation: fadeIn 0.5s ease-in-out;
+            background-color: rgba(8, 8, 10, 0.92);
+            position: relative; z-index: 10;
         }
+        .window.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes blink { 50% { opacity: 0; } }
+        
+        button { background: none; border: none; color: inherit; font-family: inherit; font-size: inherit; cursor: pointer; padding: 0; }
+        button:focus-visible, .key:focus-visible, .level-button:focus-visible, .shop-item:focus-visible, .dpad-btn:focus-visible { outline: 3px solid var(--color-accent-bios); outline-offset: 2px; }
 
-        body {
-            font-family: 'Courier New', monospace;
-            background: var(--gradient-bg);
-            color: var(--color-text);
-            overflow: hidden;
-            height: 100vh;
-        }
+        .big-button { background-color: transparent; border: 2px solid var(--color-accent-primary); color: var(--color-accent-primary); padding: 15px 30px; font-size: 1.5em; text-transform: uppercase; transition: background-color var(--transition-speed), color var(--transition-speed); }
+        .big-button:hover { background-color: var(--color-accent-primary); color: var(--color-background-primary); }
+        .big-button.disabled { pointer-events: none; opacity: 0.4; border-color: var(--color-funckey-primary); color: var(--color-funckey-primary); }
 
-        /* ============================================
-           MEJORA VISUAL #3: Diseño con profundidad
-           ============================================ */
-        #app-container {
-            width: 100%;
-            height: 100vh;
-            position: relative;
-            overflow: hidden;
-            background: var(--gradient-bg);
-        }
+        .container { display: flex; flex-direction: column; gap: 1rem; width: 100%; max-width: 1000px; text-align: center; }
+        .centered-content { display: flex; flex-direction: column; justify-content: center; align-items: center; width: 100%; height: 100%; gap: 1.5rem; }
 
-        .screen {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            display: none;
-            opacity: 0;
-            transition: opacity 0.5s ease;
-        }
-
-        .screen.active {
-            display: flex;
-            opacity: 1;
-            animation: fadeIn 0.5s ease;
-        }
-
-        /* ============================================
-           MEJORA VISUAL #2: Animaciones fluidas
-           ============================================ */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.05); }
-        }
-
-        @keyframes glow {
-            0%, 100% { box-shadow: 0 0 20px var(--color-primary-glow); }
-            50% { box-shadow: 0 0 40px var(--color-primary-glow), 0 0 60px var(--color-primary-glow); }
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(100px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .screen-content-wrapper {
-            width: 100%;
-            max-width: 800px;
-            margin: auto;
-            padding: 40px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            gap: 30px;
-        }
-
-        /* ============================================
-           MEJORA VISUAL #4: Tipografía mejorada
-           ============================================ */
-        .title {
-            font-size: 3.5rem;
-            font-weight: bold;
-            text-align: center;
-            background: var(--gradient-primary);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            text-shadow: 0 0 30px var(--color-primary-glow);
-            letter-spacing: 2px;
-            margin-bottom: 10px;
-        }
-
-        .subtitle {
-            font-size: 1.5rem;
-            color: var(--color-text-dim);
-            text-align: center;
-            margin-bottom: 20px;
-            letter-spacing: 1px;
-        }
-
-        /* ============================================
-           MEJORA VISUAL #5: Feedback visual interactivo
-           ============================================ */
-        .btn {
-            background: var(--gradient-primary);
-            color: var(--color-bg);
-            border: none;
-            padding: 18px 40px;
-            font-size: 1.2rem;
-            font-weight: bold;
-            cursor: pointer;
-            border-radius: 12px;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px var(--color-primary-glow);
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 0;
-            height: 0;
-            border-radius: 50%;
-            background: rgba(255, 255, 255, 0.3);
-            transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
-        }
-
-        .btn:hover::before {
-            width: 300px;
-            height: 300px;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 30px var(--color-primary-glow), 0 0 40px var(--color-primary-glow);
-        }
-
-        .btn:active {
-            transform: translateY(0) scale(0.98);
-        }
-
-        .btn-secondary {
-            background: var(--gradient-secondary);
-            box-shadow: 0 4px 20px rgba(123, 44, 191, 0.3);
-        }
-
-        .btn-secondary:hover {
-            box-shadow: 0 6px 30px rgba(123, 44, 191, 0.5);
-        }
-
-        .btn-small {
-            padding: 12px 24px;
-            font-size: 0.9rem;
-        }
-
-        .btn-danger {
-            background: linear-gradient(135deg, var(--color-danger) 0%, #d90429 100%);
-            box-shadow: 0 4px 20px rgba(255, 0, 110, 0.3);
-        }
-
-        .btn-icon {
-            background: var(--color-bg-lighter);
-            border: 2px solid var(--color-border);
-            border-radius: 10px;
-            padding: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .btn-icon svg {
-            width: 24px;
-            height: 24px;
-            fill: var(--color-primary);
-            transition: all 0.3s ease;
-        }
-
-        .btn-icon:hover {
-            background: var(--color-border);
-            border-color: var(--color-primary);
-            transform: scale(1.1);
-            box-shadow: 0 0 20px var(--color-primary-glow);
-        }
-
-        .btn-icon:hover svg {
-            fill: var(--color-primary);
-            filter: drop-shadow(0 0 5px var(--color-primary));
-        }
-
-        /* Glassmorphism effect */
-        .display-panel {
-            background: rgba(26, 31, 58, 0.6);
-            backdrop-filter: blur(10px);
-            border: 2px solid var(--color-border);
-            border-radius: 15px;
-            padding: 30px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), inset 0 1px 1px rgba(255, 255, 255, 0.1);
-            transition: all 0.3s ease;
-        }
-
-        .display-panel:hover {
-            border-color: var(--color-primary);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 30px var(--color-primary-glow);
-        }
-
-        /* BIOS Screen */
-        #screen-bios {
-            justify-content: center;
-            align-items: center;
-        }
-
-        #bios-logo {
-            width: 200px;
-            height: 200px;
-            margin-bottom: 30px;
-            animation: pulse 2s infinite;
-        }
-
-        #bios-text {
-            font-size: 2rem;
-            color: var(--color-success);
-            text-align: center;
-            font-family: monospace;
-        }
-
-        /* Title Screen */
-        .title-header {
-            text-align: center;
-            margin-bottom: 40px;
-            animation: slideUp 0.8s ease;
-        }
-
-        .title-footer {
-            display: flex;
-            gap: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            animation: slideUp 1s ease;
-        }
-
-        /* Keyboard */
-        #keyboard-container {
-            width: 100%;
-            max-width: 600px;
-        }
-
-        .keyboard-row {
-            display: flex;
-            gap: 8px;
-            margin-bottom: 8px;
-            justify-content: center;
-        }
-
-        .key {
-            background: var(--color-bg-lighter);
-            border: 2px solid var(--color-border);
-            border-radius: 8px;
-            padding: 15px;
-            min-width: 45px;
-            text-align: center;
-            cursor: pointer;
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--color-text);
-            transition: all 0.2s ease;
-            user-select: none;
-            text-transform: uppercase;
-        }
-
-        .key:hover {
-            background: var(--color-primary);
-            color: var(--color-bg);
-            border-color: var(--color-primary);
-            transform: translateY(-3px);
-            box-shadow: 0 4px 15px var(--color-primary-glow);
-        }
-
-        .key:active {
-            transform: translateY(0) scale(0.95);
-        }
-
-        .key.function {
-            background: var(--gradient-secondary);
-            color: var(--color-text);
-            min-width: 60px;
-        }
-
-        .key.disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
-        }
-
-        .key.disabled:hover {
-            transform: none;
-            background: var(--color-bg-lighter);
-            color: var(--color-text);
-            box-shadow: none;
-        }
-
-        .key-icon {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        #name-display, #answer-display {
-            background: var(--color-bg);
-            border: 3px solid var(--color-primary);
-            border-radius: 12px;
-            padding: 20px;
-            font-size: 2rem;
-            text-align: center;
-            color: var(--color-primary);
-            min-height: 70px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 20px;
-            box-shadow: inset 0 0 20px var(--color-primary-glow), 0 0 20px var(--color-primary-glow);
-            font-weight: bold;
-            letter-spacing: 3px;
-        }
-
-        /* Level Select */
-        #level-select-header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-
-        #system-bar {
-            display: flex;
-            gap: 10px;
-        }
-
-        #level-select-grid {
+        #preload .bios-text { width: 100%; max-width: 600px; color: var(--color-accent-bios); }
+        #preload .bios-text span { animation: blink 1s step-end infinite; }
+        #title h1 { color: var(--color-accent-primary); text-shadow: 0 0 10px var(--color-accent-primary); font-size: clamp(2em, 8vw, 5em); }
+        
+        #profile-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; padding: 1rem; max-height: 60vh; overflow-y: auto; width: 100%; }
+        .profile-card { position: relative; border: 2px solid var(--color-funckey-primary); padding: 2rem 1rem; text-transform: uppercase; font-size: 1.5em; transition: all var(--transition-speed); background-color: rgba(20, 20, 20, 0.5); }
+        .profile-card:hover { border-color: var(--color-accent-primary); color: var(--color-accent-primary); }
+        .delete-profile-btn { position: absolute; top: 5px; right: 5px; width: 30px; height: 30px; font-size: 20px; color: var(--color-text-passive); }
+        .delete-profile-btn:hover { color: var(--color-accent-error); }
+        
+        #player-name-output { border: 2px solid var(--color-accent-primary); background-color: var(--color-element-primary); color: var(--color-text-active); padding: 15px 25px; font-size: clamp(1.5em, 4vw, 2.5em); min-height: 80px; width: 100%; max-width: 800px; text-align: center; letter-spacing: 0.1em; text-transform: uppercase; flex-shrink: 0; margin-bottom: 1rem; }
+        #player-name-output::after { content: '_'; animation: blink 1s step-end infinite; }
+        
+        #keyboard-wrapper { flex-grow: 1; display: flex; justify-content: center; align-items: center; width: 100%; }
+        #virtualKeyboard { display: grid; gap: var(--gap); grid-template-columns: repeat(8, var(--k)); grid-auto-rows: var(--k); }
+        .key { position: relative; display: flex; justify-content: center; align-items: center; background-color: var(--color-element-primary); border: 1px solid var(--color-funckey-primary); color: var(--color-text-passive); font-size: calc(var(--k) * 0.4); user-select: none; transition: background-color 100ms, color 100ms; }
+        .key:active { background-color: var(--color-accent-primary); color: var(--color-background-primary); }
+        .key.span2 { grid-column: span 2; }
+        .key.funckey { background-color: var(--color-funckey-primary); color: var(--color-accent-primary); }
+        .key.active { background-color: var(--color-accent-primary); color: var(--color-background-primary); }
+        
+        #mainMenu-header { border-bottom: 2px solid var(--color-funckey-primary); padding-bottom: 1rem; margin-bottom: 1rem; width: 100%; }
+        #mainMenu-header h2 { font-size: 2em; color: var(--color-text-active); }
+        #mainMenu-player-name, #mainMenu-total-points { color: var(--color-accent-primary); font-weight: bold; }
+        .mainMenu-buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 1rem; margin-top: 1rem; }
+        
+        #level-grid { 
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            gap: 1rem;
             width: 100%;
-            margin-bottom: 30px;
-        }
-
-        .level-card {
-            background: var(--color-bg-lighter);
-            border: 2px solid var(--color-border);
-            border-radius: 15px;
-            padding: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .level-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 246, 255, 0.2), transparent);
-            transition: left 0.5s ease;
-        }
-
-        .level-card:hover::before {
-            left: 100%;
-        }
-
-        .level-card:hover {
-            border-color: var(--color-primary);
-            transform: translateY(-5px) scale(1.02);
-            box-shadow: 0 10px 30px var(--color-primary-glow);
-        }
-
-        .level-card.locked {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .level-card.locked:hover {
-            transform: none;
-            box-shadow: none;
-        }
-
-        .level-number {
-            font-size: 2rem;
-            color: var(--color-primary);
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-
-        .level-stars {
-            display: flex;
-            justify-content: center;
-            gap: 5px;
-            margin-top: 10px;
-            font-size: 1.5rem;
-        }
-
-        /* Game Screen */
-        #screen-game {
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
-        #scroll-content {
-            flex: 1;
-            overflow-y: auto;
-            padding: 20px;
-        }
-
-        #game-hud {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-            padding: 15px;
-            background: var(--color-bg-lighter);
-            border-radius: 12px;
-            border: 2px solid var(--color-border);
-        }
-
-        #hud-left, #hud-right {
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-
-        #hud-player-name {
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--color-primary);
-        }
-
-        #hud-lives, #hud-shield, #hud-streak, #hud-difficulty {
-            padding: 8px 15px;
-            background: var(--color-bg);
-            border-radius: 8px;
-            border: 2px solid var(--color-border);
-            font-weight: bold;
-        }
-
-        #problem-container {
-            font-size: 2.5rem;
-            text-align: center;
-            margin: 40px auto;
-            max-width: 600px;
-            animation: slideUp 0.5s ease;
-        }
-
-        #action-bar {
-            background: var(--color-bg-lighter);
-            padding: 30px;
-            border-top: 3px solid var(--color-primary);
-        }
-
-        #numpad-grid {
-            display: grid;
+            padding: 1rem;
             grid-template-columns: repeat(3, 1fr);
-            gap: 12px;
-            max-width: 400px;
-            margin: 0 auto;
         }
 
-        .numpad-grid .key {
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.8rem;
+        @media (min-width: 768px) {
+            #level-grid {
+                grid-template-columns: repeat(6, 1fr);
+                max-width: 900px;
+                margin-left: auto;
+                margin-right: auto;
+            }
         }
 
-        /* Result Screen */
-        #result-icon {
-            width: 150px;
-            height: 150px;
-            margin-bottom: 20px;
-            animation: pulse 2s infinite;
-        }
+        .level-button { position: relative; display: flex; justify-content: center; align-items: center; aspect-ratio: 1 / 1; border: 2px solid var(--color-funckey-primary); background-color: var(--color-element-primary); color: var(--color-text-passive); font-size: 2.5em; transition: all var(--transition-speed); cursor: pointer; }
+        .level-button .highscore { display: none; position: absolute; bottom: 5px; left: 0; right: 0; font-size: 0.3em; color: var(--color-accent-bios); }
+        .level-button:hover:not(.locked) .highscore { display: block; }
+        .level-button:hover:not(.locked) { border-color: var(--color-accent-primary); color: var(--color-accent-primary); text-shadow: 0 0 10px var(--color-accent-primary); }
+        .level-button.completed { border-color: var(--color-accent-bios); }
+        .level-button.completed:hover { border-color: var(--color-accent-primary); }
+        .level-button.locked { pointer-events: none; opacity: 0.4; }
+        .lock-icon { width: 40%; height: 40%; fill: var(--color-text-passive); }
 
-        #result-title {
-            font-size: 3rem;
-            margin-bottom: 20px;
-        }
+        .page-header { width: 100%; text-align: center; border-bottom: 2px solid var(--color-funckey-primary); padding-bottom: 1rem; }
+        #shop-items-container { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; padding: 1rem; max-height: 70vh; overflow-y: auto; }
+        .shop-item { display: flex; flex-direction: column; text-align: left; padding: 1rem; border: 2px solid var(--color-funckey-primary); transition: all var(--transition-speed); background-color: rgba(20, 20, 20, 0.5); }
+        .shop-item:hover { border-color: var(--color-accent-bios); }
+        .shop-item h3 { color: var(--color-accent-bios); }
+        .shop-item-details { flex-grow: 1; }
+        .shop-item-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; }
+        .shop-item-cost { font-size: 1.5em; color: var(--color-accent-primary); }
+        
+        #stats-display { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; padding: 1rem; width: 100%; }
+        .stat-card { background-color: var(--color-element-primary); padding: 1rem; }
+        .stat-card .value { font-size: 2em; color: var(--color-accent-primary); }
+        #achievements-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; padding: 1rem; max-height: 50vh; overflow-y: auto; }
+        .achievement-card { padding: 1rem; border: 2px solid var(--color-funckey-primary); text-align: left; background-color: rgba(20, 20, 20, 0.5); }
+        .achievement-card.unlocked { border-color: var(--color-accent-bios); }
+        .achievement-card h3 { color: var(--color-accent-bios); }
+        .achievement-card.locked h3 { color: var(--color-funckey-primary); }
+        .achievement-card.locked p { opacity: 0.5; }
 
-        #result-explanation {
-            font-size: 1.2rem;
-            color: var(--color-text-dim);
-            text-align: center;
-            margin: 20px 0;
+        #game { justify-content: flex-start; position: relative; background-color: transparent; }
+        
+        #game-hud { 
+            font-size: 1.6em; color: var(--color-text-active); flex-shrink: 0; 
+            padding: 10px 20px; width: 100%; height: 50px; z-index: 10;
+            display: flex; justify-content: space-between; align-items: center;
         }
+        #game-hud .delivered { color: var(--color-accent-bios); text-shadow: 0 0 5px var(--color-accent-bios); }
 
-        /* Profile Screen */
-        #profile-stats {
-            display: flex;
-            gap: 40px;
-            justify-content: center;
-            margin: 30px 0;
+        #game-canvas-wrapper { width: 100%; flex-grow: 1; display: flex; justify-content: center; align-items: center; }
+        #game-canvas { background-color: rgba(10, 10, 10, 0.9); border: 2px solid var(--color-funckey-primary); box-shadow: 0 0 10px var(--color-funckey-primary); transition: box-shadow 0.3s; }
+        
+        .glitch { animation: glitch-anim 0.3s steps(2, end) forwards; }
+        @keyframes glitch-anim {
+          0% { text-shadow: -2px -2px 0 var(--color-accent-error), 2px 2px 0 var(--color-accent-primary); filter: hue-rotate(0deg); transform: translate(0, 0); }
+          25% { text-shadow: 2px 2px 0 var(--color-accent-error), -2px -2px 0 var(--color-accent-primary); filter: hue-rotate(90deg); transform: translate(-2px, 2px); }
+          50% { text-shadow: 2px -2px 0 var(--color-accent-error), -2px 2px 0 var(--color-accent-primary); filter: hue-rotate(180deg); transform: translate(2px, -2px); }
+          75% { text-shadow: -2px 2px 0 var(--color-accent-error), 2px -2px 0 var(--color-accent-primary); filter: hue-rotate(270deg); transform: translate(-2px, 2px); }
+          100% { text-shadow: 0 0 0 transparent; filter: hue-rotate(360deg); transform: translate(0, 0); }
         }
+        
+        .panic-mode #game-canvas { animation: panic-flash 1s infinite; }
+        @keyframes panic-flash { 50% { box-shadow: 0 0 20px 10px var(--color-accent-error); border-color: var(--color-accent-error); } }
 
-        #profile-stats > div {
-            text-align: center;
+        #dpad-container {
+            display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+            width: 180px; height: 180px; grid-template-columns: 1fr 1fr 1fr; grid-template-rows: 1fr 1fr 1fr;
+            gap: 2px; background-color: rgba(10, 10, 10, 0.7); padding: 10px; border-radius: 10px; z-index: 10;
         }
-
-        .stat-value {
-            font-size: 3rem;
-            color: var(--color-primary);
-            font-weight: bold;
-            margin-bottom: 10px;
+        #dpad-container.visible { display: grid; }
+        #dpad-drag-handle { grid-area: 2 / 2 / 3 / 3; cursor: move; background-color: rgba(255, 255, 255, 0.1); border-radius: 50%; border: 2px dashed var(--color-funckey-primary); }
+        .dpad-btn {
+            background-color: var(--color-element-primary); border: 1px solid var(--color-funckey-primary);
+            display: flex; justify-content: center; align-items: center; transition: all 100ms; user-select: none;
         }
+        .dpad-btn svg { width: 60%; height: 60%; fill: var(--color-text-passive); transition: fill 100ms; pointer-events: none; }
+        .dpad-btn:active { background-color: var(--color-accent-primary); transform: scale(0.95); }
+        .dpad-btn:active svg { fill: var(--color-background-primary); }
+        #dpad-up { grid-area: 1 / 2 / 2 / 3; } #dpad-left { grid-area: 2 / 1 / 3 / 2; } #dpad-down { grid-area: 3 / 2 / 4 / 3; } #dpad-right { grid-area: 2 / 3 / 3 / 4; }
+        
+        #victory h2 { font-size: 3em; color: var(--color-accent-bios); margin-bottom: 2rem; }
 
-        .arsenal-group {
-            width: 100%;
-            margin: 30px 0;
-        }
+        #settings-button { display: none; position: fixed; top: 20px; right: 20px; width: 50px; height: 50px; background-color: var(--color-element-primary); border: 1px solid var(--color-funckey-primary); color: var(--color-text-passive); font-size: 28px; justify-content: center; align-items: center; cursor: pointer; z-index: 1001; transition: color var(--transition-speed); user-select: none; }
+        #settings-button:hover { color: var(--color-accent-primary); }
+        #settings-panel { display: none; position: fixed; top: 80px; right: 20px; background-color: var(--color-element-primary); border: 1px solid var(--color-funckey-primary); z-index: 1001; padding: 10px; }
+        #settings-panel button { display: block; width: 100%; text-align: left; background-color: var(--color-funckey-primary); color: var(--color-text-passive); border: 1px solid var(--color-text-passive); padding: 10px 20px; margin-top: 10px; cursor: pointer; font-family: var(--font-family); font-size: 1em; }
+        #settings-panel button:first-child { margin-top: 0; }
+        #settings-panel button:hover { border-color: var(--color-accent-primary); color: var(--color-accent-primary); }
 
-        .arsenal-title {
-            font-size: 1.3rem;
-            color: var(--color-primary);
-            margin-bottom: 15px;
-            text-align: center;
-        }
-
-        .arsenal-options {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .arsenal-option {
-            width: 80px;
-            height: 80px;
-            border-radius: 12px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 3px solid var(--color-border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .arsenal-option:hover {
-            transform: scale(1.1);
-            border-color: var(--color-primary);
-            box-shadow: 0 0 20px var(--color-primary-glow);
-        }
-
-        .arsenal-option.selected {
-            border-color: var(--color-primary);
-            box-shadow: 0 0 30px var(--color-primary-glow);
-            animation: glow 2s infinite;
-        }
-
-        /* Overlays */
-        #scanline-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            background: repeating-linear-gradient(
-                0deg,
-                rgba(0, 0, 0, 0.15) 0px,
-                transparent 1px,
-                transparent 2px,
-                rgba(0, 0, 0, 0.15) 3px
-            );
-            z-index: 1000;
-            opacity: 0.3;
-        }
-
-        #anomaly-alert {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
+        #fullscreen-enforcer {
             z-index: 2000;
+            background-color: rgba(8, 8, 10, 0.9);
         }
 
-        #anomaly-alert.active {
-            display: flex;
-            animation: fadeIn 0.3s ease;
+        #game { flex-direction: row; align-items: stretch; padding: 0; }
+        #game-main-panel { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+        #game-side-panel {
+            flex-basis: 220px; flex-shrink: 0; border-left: 2px solid var(--color-funckey-primary);
+            display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
+            padding: 1rem; gap: 1rem; background-color: rgba(8, 8, 10, 0.92);
+        }
+        #minimap-canvas { width: 100%; max-width: 180px; aspect-ratio: 1 / 1; border: 1px solid var(--color-funckey-primary); margin-bottom: 1rem; background-color: rgba(0,0,0,0.3); }
+        #item-hud-container { display: flex; justify-content: space-around; width: 100%; max-width: 180px; }
+        .item-hud-icon { 
+            width: 40px; height: 40px; border: 1px solid var(--color-funckey-primary); padding: 5px; opacity: 0.3;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .item-hud-icon.active { opacity: 1.0; }
+
+        #side-hud-scores { width: 100%; text-align: right; font-size: 1.4em; }
+        #side-hud-combo { color: var(--color-accent-bios); text-shadow: 0 0 5px var(--color-accent-bios); margin-top: 5px; height: 1.2em; }
+        #digital-timer {
+            font-size: 2.5em;
+            color: var(--color-accent-primary);
+            text-shadow: 0 0 8px var(--color-accent-primary);
+            transition: color 0.3s, text-shadow 0.3s;
+            padding: 10px;
         }
 
-        #anomaly-alert-content {
-            background: var(--color-bg-lighter);
-            border: 3px solid var(--color-danger);
-            border-radius: 20px;
-            padding: 40px;
-            max-width: 500px;
-            text-align: center;
-            box-shadow: 0 0 50px rgba(255, 0, 110, 0.5);
+        #static-dpad-container {
+            display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+            gap: 0.5rem; width: 100%; max-width: 180px; aspect-ratio: 1 / 1; margin-top: auto;
         }
+        #static-dpad-container .dpad-btn:hover { border-color: var(--color-accent-primary); transform: scale(1.05); }
+        #static-dpad-container .dpad-btn:active { background-color: var(--color-accent-primary); transform: scale(0.95); }
+        #static-dpad-container .dpad-btn:active svg { fill: var(--color-background-primary); }
+        #sdpad-reset { grid-area: 2 / 2 / 3 / 3; font-size: 1.8em; color: var(--color-accent-error); }
+        #sdpad-reset:hover { border-color: var(--color-accent-error); }
 
-        #anomaly-alert-title {
-            color: var(--color-danger);
-            font-size: 2rem;
-            margin-bottom: 20px;
-        }
-
-        #fullscreen-prompt {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.95);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1500;
-        }
-
-        #fullscreen-prompt.active {
-            display: flex;
-        }
-
-        #fullscreen-prompt-content {
-            text-align: center;
-            padding: 40px;
-        }
-
-        /* Responsive */
         @media (max-width: 768px) {
-            .title {
-                font-size: 2.5rem;
-            }
-
-            .subtitle {
-                font-size: 1.2rem;
-            }
-
-            #level-select-grid {
-                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            }
-
-            .btn {
-                padding: 15px 30px;
-                font-size: 1rem;
-            }
-
-            #problem-container {
-                font-size: 2rem;
-            }
-        }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar {
-            width: 10px;
-        }
-
-        ::-webkit-scrollbar-track {
-            background: var(--color-bg);
-        }
-
-        ::-webkit-scrollbar-thumb {
-            background: var(--color-primary);
-            border-radius: 5px;
-        }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--color-primary-dark);
+            #game-side-panel { display: none; }
+            #game-hud { font-size: 1.2em; flex-direction: column; height: auto; gap: 5px; }
         }
     </style>
 </head>
 <body>
-    <div id=\"app-container\">
-        <div id=\"scanline-overlay\"></div>
+    <canvas id="matrix-canvas"></canvas>
+    <div class="scanlines"></div>
+    <div id="a11y-live-region" aria-live="polite" style="position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;"></div>
+
+    <div id="preload" class="window active">
+        <div class="container centered-content">
+            <div class="bios-text">
+                <p>ANALYZER BIOS v1.9 (c) McLaure</p>
+                <p>Initializing KERNEL...</p>
+                <p>Memory Check: 65536K OK</p>
+                <p>Loading UI assets... DONE</p>
+                <p id="preflight-status">Running preflight checks...<span>_</span></p>
+            </div>
+        </div>
+    </div>
+    <div id="title" class="window">
+        <div class="container centered-content">
+            <h1>ANALYZER INTERFACE</h1>
+            <button id="start-btn" class="big-button">INICIAR Y ENTRAR A PANTALLA COMPLETA</button>
+        </div>
+    </div>
+    
+    <div id="profiles" class="window">
+        <div class="container centered-content">
+            <h2>SELECCIONA TU PERFIL DE OPERADOR</h2>
+            <div id="profile-grid"></div>
+            <button id="new-player-btn" class="big-button">NUEVO OPERADOR</button>
+        </div>
+    </div>
+    
+    <div id="player" class="window"><div class="container centered-content"><h2>INGRESA TU NOMBRE DE OPERADOR</h2><div id="player-name-output"></div><div id="keyboard-wrapper"><div id="virtualKeyboard"></div></div></div></div>
+    <div id="mainMenu" class="window">
+        <div class="container centered-content">
+            <div id="mainMenu-header">
+                <h2 id="mainMenu-title">MENU DE NIVELES</h2>
+                <p>OPERADOR: <span id="mainMenu-player-name"></span> | PUNTOS: <span id="mainMenu-total-points">0</span></p>
+            </div>
+            <div id="level-grid"></div>
+            <div class="mainMenu-buttons">
+                <button id="stats-btn" class="big-button">ESTADISTICAS</button>
+                <button id="terminal-btn" class="big-button">TERMINAL</button>
+            </div>
+        </div>
+    </div>
+    <div id="terminal" class="window">
+        <div class="container centered-content">
+            <div class="page-header">
+                <h2>TERMINAL DE MEJORAS</h2>
+                <p>PUNTOS DISPONIBLES: <span id="terminal-total-points">0</span></p>
+            </div>
+            <div id="shop-items-container"></div>
+            <button id="back-to-menu-btn" class="big-button">VOLVER AL MENU</button>
+        </div>
+    </div>
+    <div id="stats" class="window">
+        <div class="container centered-content">
+            <div class="page-header"><h2>REGISTRO DEL OPERADOR</h2></div>
+            <div id="stats-display"></div>
+            <h3>LOGROS DESBLOQUEADOS</h3>
+            <div id="achievements-grid"></div>
+            <button id="stats-back-btn" class="big-button">VOLVER AL MENU</button>
+        </div>
+    </div>
+
+    <div id="game" class="window">
+        <div id="game-main-panel">
+            <div id="game-hud">
+                <span id="hud-target"></span>
+                <span id="hud-player-level"></span>
+            </div>
+            <div id="game-canvas-wrapper"><canvas id="game-canvas"></canvas></div>
+        </div>
+
+        <div id="game-side-panel">
+            <canvas id="minimap-canvas" width="180" height="180"></canvas>
+            <div id="item-hud-container"></div>
+
+            <div id="side-hud-scores">
+                <div id="side-hud-score"></div>
+                <div id="side-hud-moves"></div>
+                <div id="side-hud-total"></div>
+                <div id="side-hud-combo"></div>
+            </div>
+            <div id="digital-timer">00:00</div>
+            <div id="static-dpad-container">
+                <div class="dpad-placeholder"></div>
+                <button class="dpad-btn" id="sdpad-up" data-key="ArrowUp" aria-label="MOVER ARRIBA"><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg></button>
+                <div class="dpad-placeholder"></div>
+                <button class="dpad-btn" id="sdpad-left" data-key="ArrowLeft" aria-label="MOVER A LA IZQUIERDA"><svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg></button>
+                <button class="dpad-btn" id="sdpad-reset" aria-label="REINICIAR NIVEL">R</button>
+                <button class="dpad-btn" id="sdpad-right" data-key="ArrowRight" aria-label="MOVER A LA DERECHA"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+                <div class="dpad-placeholder"></div>
+                <button class="dpad-btn" id="sdpad-down" data-key="ArrowDown" aria-label="MOVER ABAJO"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></button>
+                <div class="dpad-placeholder"></div>
+            </div>
+        </div>
+
+        <div id="dpad-container">
+            <div id="dpad-drag-handle"></div>
+            <button class="dpad-btn" id="dpad-up" data-key="ArrowUp" aria-label="MOVER ARRIBA"><svg viewBox="0 0 24 24"><path d="M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z"/></svg></button>
+            <button class="dpad-btn" id="dpad-left" data-key="ArrowLeft" aria-label="MOVER A LA IZQUIERDA"><svg viewBox="0 0 24 24"><path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6z"/></svg></button>
+            <button class="dpad-btn" id="dpad-down" data-key="ArrowDown" aria-label="MOVER ABAJO"><svg viewBox="0 0 24 24"><path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6z"/></svg></button>
+            <button class="dpad-btn" id="dpad-right" data-key="ArrowRight" aria-label="MOVER A LA DERECHA"><svg viewBox="0 0 24 24"><path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/></svg></button>
+        </div>
+    </div>
         
-        <!-- Anomaly Alert -->
-        <div id=\"anomaly-alert\">
-            <div id=\"anomaly-alert-content\">
-                <h1 id=\"anomaly-alert-title\"></h1>
-                <div id=\"anomaly-alert-message\"></div>
-            </div>
+    <div id="victory" class="window">
+        <div class="container centered-content">
+            <h2>COMANDO EJECUTADO</h2>
+            <button id="victory-continue-btn" class="big-button">CONTINUAR</button>
         </div>
+    </div>
 
-        <!-- Fullscreen Prompt -->
-        <div id=\"fullscreen-prompt\">
-            <div id=\"fullscreen-prompt-content\">
-                <h2 class=\"subtitle\">Para una mejor experiencia, se recomienda jugar en pantalla completa.</h2>
-                <button id=\"btn-gofullscreen\" class=\"btn\">REACTIVAR PANTALLA COMPLETA</button>
-                <button id=\"btn-continue-anyway\" class=\"btn btn-secondary btn-small\">Continuar de todos modos</button>
-            </div>
-        </div>
+    <button id="settings-button">?</button>
+    <div id="settings-panel">
+        <button id="sound-btn">SONIDO: ON</button>
+        <button id="palette-btn">PALETA</button>
+        <button id="dpad-settings-btn">D-PAD: ON</button>
+        <button id="change-player-btn">CAMBIAR JUGADOR</button>
+        <button id="exit-btn">SALIR</button>
+    </div>
 
-        <!-- BIOS Screen -->
-        <div id=\"screen-bios\" class=\"screen active\">
-            <div class=\"screen-content-wrapper\">
-                <svg viewBox=\"0 0 100 100\" id=\"bios-logo\">
-                    <path d=\"M10 90 L20 90 L25 40 L80 40 L85 70 L60 70 L55 80 L90 80 M25 40 L30 20 L45 20 L50 40\" 
-                          stroke=\"#06ffa5\" stroke-width=\"3\" fill=\"none\" 
-                          stroke-linecap=\"round\" stroke-linejoin=\"round\"/>
-                    <circle cx=\"35\" cy=\"90\" r=\"5\" stroke=\"#06ffa5\" stroke-width=\"3\" fill=\"none\"/>
-                    <circle cx=\"70\" cy=\"90\" r=\"5\" stroke=\"#06ffa5\" stroke-width=\"3\" fill=\"none\"/>
-                </svg>
-                <p id=\"bios-text\">Cargando...</p>
-            </div>
-        </div>
-
-        <!-- Title Screen -->
-        <div id=\"screen-title\" class=\"screen\">
-            <div id=\"title-screen-wrapper\" class=\"screen-content-wrapper\">
-                <div class=\"title-header\">
-                    <h1 class=\"title\">Misión Supermercado</h1>
-                    <h2 class=\"subtitle\">Un juego de matemáticas</h2>
-                </div>
-                <div class=\"title-footer\">
-                    <button id=\"btn-start\" class=\"btn\">INICIAR</button>
-                    <button id=\"btn-sound-toggle\" class=\"btn-icon\">
-                        <svg viewBox=\"0 0 24 24\">
-                            <path d=\"M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z\"/>
-                        </svg>
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Name Entry Screen -->
-        <div id=\"screen-name\" class=\"screen\">
-            <div class=\"screen-content-wrapper\">
-                <h2 class=\"subtitle\">Introduce tu nombre</h2>
-                <div id=\"name-display\">_</div>
-                <div id=\"keyboard-container\">
-                    <div class=\"keyboard-row\">
-                        <div class=\"key\" data-key=\"q\">q</div>
-                        <div class=\"key\" data-key=\"w\">w</div>
-                        <div class=\"key\" data-key=\"e\">e</div>
-                        <div class=\"key\" data-key=\"r\">r</div>
-                        <div class=\"key\" data-key=\"t\">t</div>
-                        <div class=\"key\" data-key=\"y\">y</div>
-                        <div class=\"key\" data-key=\"u\">u</div>
-                        <div class=\"key\" data-key=\"i\">i</div>
-                        <div class=\"key\" data-key=\"o\">o</div>
-                        <div class=\"key\" data-key=\"p\">p</div>
-                    </div>
-                    <div class=\"keyboard-row\">
-                        <div class=\"key\" data-key=\"a\">a</div>
-                        <div class=\"key\" data-key=\"s\">s</div>
-                        <div class=\"key\" data-key=\"d\">d</div>
-                        <div class=\"key\" data-key=\"f\">f</div>
-                        <div class=\"key\" data-key=\"g\">g</div>
-                        <div class=\"key\" data-key=\"h\">h</div>
-                        <div class=\"key\" data-key=\"j\">j</div>
-                        <div class=\"key\" data-key=\"k\">k</div>
-                        <div class=\"key\" data-key=\"l\">l</div>
-                        <div class=\"key\" data-key=\"ñ\">ñ</div>
-                    </div>
-                    <div class=\"keyboard-row\">
-                        <div class=\"key function\" data-key=\"SHIFT\">
-                            <svg class=\"key-icon\" viewBox=\"0 0 24 24\">
-                                <path d=\"M7.41 15.41L12 10.83l4.59 4.58L18 14l-6-6-6 6z\"/>
-                            </svg>
-                        </div>
-                        <div class=\"key\" data-key=\"z\">z</div>
-                        <div class=\"key\" data-key=\"x\">x</div>
-                        <div class=\"key\" data-key=\"c\">c</div>
-                        <div class=\"key\" data-key=\"v\">v</div>
-                        <div class=\"key\" data-key=\"b\">b</div>
-                        <div class=\"key\" data-key=\"n\">n</div>
-                        <div class=\"key\" data-key=\"m\">m</div>
-                        <div class=\"key function\" data-key=\"BACKSPACE\">
-                            <svg class=\"key-icon\" viewBox=\"0 0 24 24\">
-                                <path d=\"M22 3H7c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-4.79 13.21L15.5 14.5l-2.29-2.29L10.92 14.5 9.5 13.08l2.29-2.29L9.5 8.5l1.42-1.42 2.29 2.29L15.5 7.08l1.42 1.42-2.29 2.29L17.21 13.08l-1.42 1.42z\"/>
-                            </svg>
-                        </div>
-                        <div class=\"key disabled\" data-key=\"✓\" id=\"name-confirm-key\">✓</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Level Select Screen -->
-        <div id=\"screen-level-select\" class=\"screen\">
-            <div class=\"screen-content-wrapper\">
-                <div id=\"level-select-header\">
-                    <h2 id=\"level-select-greeting\" class=\"subtitle\"></h2>
-                    <div id=\"system-bar\">
-                        <button id=\"btn-profile\" class=\"btn-icon\">
-                            <svg viewBox=\"0 0 24 24\">
-                                <path d=\"M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z\"/>
-                            </svg>
-                        </button>
-                        <button id=\"btn-main-sound-toggle\" class=\"btn-icon\">
-                            <svg viewBox=\"0 0 24 24\">
-                                <path d=\"M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z\"/>
-                            </svg>
-                        </button>
-                        <button id=\"btn-change-name\" class=\"btn-icon\">
-                            <svg viewBox=\"0 0 24 24\">
-                                <path d=\"M16 17v-3H9v-4h7V7l5 5-5 5zM14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z\"/>
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-                <div id=\"level-select-grid\"></div>
-                <div id=\"level-select-buttons\">
-                    <button id=\"btn-infinite-mode\" class=\"btn\">Turno del Experto ♾️</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Game Screen -->
-        <div id=\"screen-game\" class=\"screen\">
-            <div id=\"scroll-content\">
-                <div id=\"game-hud\">
-                    <div id=\"hud-left\">
-                        <span id=\"hud-player-name\"></span>
-                        <div id=\"hud-wins-tracker\"></div>
-                    </div>
-                    <div id=\"hud-right\">
-                        <div id=\"hud-lives\"></div>
-                        <div id=\"hud-shield\"></div>
-                        <span id=\"hud-streak\"></span>
-                        <span id=\"hud-difficulty\"></span>
-                    </div>
-                </div>
-                <div id=\"problem-container\" class=\"display-panel\"></div>
-            </div>
-            <div id=\"action-bar\">
-                <div id=\"answer-display\">_</div>
-                <div id=\"numpad-grid\" class=\"standard\">
-                    <div class=\"key\" data-key=\"1\">1</div>
-                    <div class=\"key\" data-key=\"2\">2</div>
-                    <div class=\"key\" data-key=\"3\">3</div>
-                    <div class=\"key\" data-key=\"4\">4</div>
-                    <div class=\"key\" data-key=\"5\">5</div>
-                    <div class=\"key\" data-key=\"6\">6</div>
-                    <div class=\"key\" data-key=\"7\">7</div>
-                    <div class=\"key\" data-key=\"8\">8</div>
-                    <div class=\"key\" data-key=\"9\">9</div>
-                    <div class=\"key\" data-key=\"C\">
-                        <svg class=\"key-icon\" viewBox=\"0 0 24 24\">
-                            <path d=\"M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z\"/>
-                        </svg>
-                    </div>
-                    <div class=\"key\" data-key=\"0\">0</div>
-                    <div class=\"key function disabled\" data-key=\"ENTER\" id=\"numpad-enter\">
-                        <svg class=\"key-icon\" viewBox=\"0 0 24 24\">
-                            <path d=\"M19 7v4H5.83l3.58-3.59L8 6l-6 6 6 6 1.41-1.41L5.83 13H21V7z\"/>
-                        </svg>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Result Screen -->
-        <div id=\"screen-result\" class=\"screen\">
-            <div class=\"screen-content-wrapper\">
-                <svg id=\"result-icon\" viewBox=\"0 0 100 100\"></svg>
-                <h1 id=\"result-title\" class=\"title\"></h1>
-                <p id=\"unlock-message\"></p>
-                <p id=\"result-explanation\"></p>
-                <button id=\"btn-next-mission\" class=\"btn\"></button>
-            </div>
-        </div>
-
-        <!-- Profile Screen -->
-        <div id=\"screen-profile\" class=\"screen\">
-            <div class=\"screen-content-wrapper\">
-                <h1 class=\"title\">Progreso del Jugador</h1>
-                <h2 id=\"profile-player-name\" class=\"subtitle\"></h2>
-                <div id=\"profile-stats\">
-                    <div>
-                        <div class=\"stat-value\"><span id=\"profile-total-stars\">0</span>/30</div>
-                        <div>Estrellas</div>
-                    </div>
-                    <div>
-                        <div class=\"stat-value\"><span id=\"profile-mastered-levels\">0</span>/10</div>
-                        <div>Niveles Dominados</div>
-                    </div>
-                </div>
-                <div id=\"arsenal-section\">
-                    <div id=\"color-palette-group\" class=\"arsenal-group\" style=\"display: none;\">
-                        <h3 class=\"arsenal-title\">Paleta de Colores</h3>
-                        <div id=\"color-options\" class=\"arsenal-options\"></div>
-                    </div>
-                    <div id=\"numpad-style-group\" class=\"arsenal-group\" style=\"display: none;\">
-                        <h3 class=\"arsenal-title\">Diseño de Teclado</h3>
-                        <div id=\"numpad-options\" class=\"arsenal-options\"></div>
-                    </div>
-                </div>
-                <button id=\"btn-back-to-levels\" class=\"btn\">Volver a Niveles</button>
-                <button id=\"btn-reset-progress\" class=\"btn btn-danger btn-small\">Reiniciar Progreso</button>
-            </div>
+    <div id="fullscreen-enforcer" class="window">
+        <div class="container centered-content">
+            <h2>PANTALLA COMPLETA REQUERIDA</h2>
+            <p style="font-size: 1.2em; max-width: 600px;">ANALYZER está diseñado para una experiencia inmersiva. Por favor, reanuda el modo de pantalla completa para continuar.</p>
+            <button id="resume-fullscreen-btn" class="big-button" style="margin-top: 2rem;">REANUDAR SESIÓN</button>
         </div>
     </div>
 
     <script>
-        /* ============================================================================
-           MEJORA DE CÓDIGO #1: Arquitectura modular con separación de responsabilidades
-           ============================================================================ */
-        
-        // Módulo de Gestión de Estado del Juego
-        var GameState = (function() {
-            var state = {
-                playerName: '',
-                currentLevel: 1,
-                lives: 3,
-                shield: false,
-                streak: 0,
-                score: 0,
-                currentAnswer: '',
-                currentProblem: null,
-                soundEnabled: true,
-                levels: [],
-                infiniteMode: false
+        document.addEventListener('DOMContentLoaded', () => {
+            const CONFIG = {
+                PLAYER_MOVE_DURATION: 120,
+                LETTER_MOVE_DURATION: 140,
+                PLAYER_INVINCIBILITY_TICKS: 90,
+                COMMAND_COMPLETE_BONUS: 1000,
+                LETTER_DELIVER_SCORE: 250,
+                TIME_EXPIRED_PENALTY: 500,
+                ENEMY_HIT_PENALTY_SCORE: 150,
+                TIME_BONUS_PER_SECOND: 10,
+                MOVE_PENALTY_PER_MOVE: 50,
+                MOVE_BONUS_BASE: 5000,
+                COMBO_TIME_WINDOW: 5000,
+                COMBO_MULTIPLIER_INCREMENT: 0.5,
+                TRAIL_MAX_LENGTH: 15,
+                PANIC_MODE_THRESHOLD: 15000,
+                PANIC_MODE_SPEED_MULTIPLIER: 1.25,
             };
-
-            var LEVEL_CONFIG = [
-                { number: 1, name: \"Suma Básica\", type: \"addition\", range: [1, 10], problems: 5 },
-                { number: 2, name: \"Resta Simple\", type: \"subtraction\", range: [1, 10], problems: 5 },
-                { number: 3, name: \"Suma Avanzada\", type: \"addition\", range: [10, 50], problems: 7 },
-                { number: 4, name: \"Resta Avanzada\", type: \"subtraction\", range: [10, 50], problems: 7 },
-                { number: 5, name: \"Multiplicación x2\", type: \"multiplication\", multiplier: 2, range: [1, 10], problems: 8 },
-                { number: 6, name: \"Multiplicación x5\", type: \"multiplication\", multiplier: 5, range: [1, 10], problems: 8 },
-                { number: 7, name: \"División Simple\", type: \"division\", divisors: [2, 5, 10], range: [10, 50], problems: 8 },
-                { number: 8, name: \"Operaciones Mixtas\", type: \"mixed\", range: [1, 20], problems: 10 },
-                { number: 9, name: \"Desafío Numérico\", type: \"mixed\", range: [10, 100], problems: 12 },
-                { number: 10, name: \"Maestro Matemático\", type: \"mixed\", range: [1, 100], problems: 15 }
-            ];
-
-            return {
-                get: function(key) {
-                    return state[key];
-                },
-                set: function(key, value) {
-                    state[key] = value;
-                },
-                getLevelConfig: function(levelNum) {
-                    return LEVEL_CONFIG[levelNum - 1];
-                },
-                getAllLevels: function() {
-                    return LEVEL_CONFIG;
-                },
-                reset: function() {
-                    state.currentAnswer = '';
-                    state.lives = 3;
-                    state.shield = false;
-                    state.streak = 0;
-                    state.score = 0;
-                }
-            };
-        })();
-
-        /* ============================================================================
-           MEJORA DE CÓDIGO #2: Sistema robusto de persistencia con validación
-           ============================================================================ */
-        
-        // Módulo de Almacenamiento con validación y manejo de errores
-        var StorageManager = (function() {
-            var STORAGE_KEY = 'superMercadoGame_v4';
             
-            function isLocalStorageAvailable() {
-                try {
-                    var test = '__storage_test__';
-                    localStorage.setItem(test, test);
-                    localStorage.removeItem(test);
-                    return true;
-                } catch(e) {
-                    return false;
-                }
-            }
+            const WORD_BANK = {
+                LEN_4: ["GATO", "LUNA", "RANA", "FLOR", "NUBE", "CASA", "SOL", "MAR", "PATO", "ROSA"],
+                LEN_5: ["PERRO", "QUESO", "SILLA", "MESA", "LIBRO", "ARBOL", "TIGRE", "JUGAR"],
+                LEN_6: ["PAYASO", "PELOTA", "MUNDO", "BOTON", "GUANTE", "ESPEJO", "NARIZ"],
+                LEN_7: ["FAMILIA", "COLORES", "VENTANA", "MAESTRO", "DIBUJOS", "CARRITO", "ESCUELA", "PLANETA", "CASTILLO"],
+                LEN_8: ["ESTRELLA", "MARIPOSA", "ELEFANTE", "CHOCOLAT", "CUADERNO", "BICICLETA", "FANTASMA"],
+                LEN_9: ["CHOCOLATE", "COCODRILO", "JIRAFITAS", "PAJARITOS", "AMIGUITOS", "TELEFONO", "AVENTURA", "MOCHILA"],
+                LEN_10: ["ABECEDARIO", "DINOSAURIO", "PIZARRITAS", "COMPUTADOR", "BIBLIOTECA", "CALENDARIO", "HELICOPTER"],
+                LEN_11: ["COMPUTADORA", "UNIVERSIDAD", "ELECTRICIDAD"],
+                LEN_12_PLUS: ["DOCUMENTARIO", "REFRIGERADOR", "CONSTITUCION", "EXTRAORDINARIO", "RESPONSABILIDAD", "COMUNICACION"]
+            };
 
-            function validateData(data) {
-                if (!data || typeof data !== 'object') return false;
-                if (!data.playerName || typeof data.playerName !== 'string') return false;
-                if (!Array.isArray(data.levels)) return false;
-                return true;
-            }
+            const LEVEL_CONFIG = {
+                OPEN_FIELD: [
+                    { level: 1, commandCategory: 'LEN_4', gridSize: 60, timeLimit: 90, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.005 } }] },
+                    { level: 2, commandCategory: 'LEN_5', gridSize: 58, timeLimit: 120, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.005 } }], specialBlocks: [{type: 'BOOST', count: 2}] },
+                    { level: 3, commandCategory: 'LEN_6', gridSize: 56, specialBlocks: [{ type: 'SOLID', count: 4 }], timeLimit: 150, enemies: [{ type: 'PATRULLA', count: 2, params: { speed: 0.006 } }] },
+                    { level: 4, commandCategory: 'LEN_7', gridSize: 55, specialBlocks: [{ type: 'SOLID', count: 5 }], timeLimit: 180, enemies: [{ type: 'RASTREADOR', count: 1, params: { speed: 3500 } }] },
+                    { level: 5, commandCategory: 'LEN_8', gridSize: 53, specialBlocks: [{ type: 'SLOW', count: 6 }, {type: 'UNSTABLE', count: 2, cycle: 4000}], timeLimit: 140, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.007 } }] },
+                    { level: 6, commandCategory: 'LEN_8', gridSize: 51, specialBlocks: [{ type: 'SOLID', count: 4 }, {type: 'BOOST', count: 3}], timeLimit: 160, enemies: [{ type: 'RASTREADOR', count: 1, params: { speed: 3000 } }] },
+                    { level: 7, commandCategory: 'LEN_9', gridSize: 49, specialBlocks: [{ type: 'SOLID', count: 6 }], timeLimit: 180, enemies: [{ type: 'RASTREADOR', count: 2, params: { speed: 4000 } }] },
+                    { level: 8, commandCategory: 'LEN_9', gridSize: 47, specialBlocks: [{ type: 'SOLID', count: 3 }, { type: 'SLOW', count: 3 }, {type: 'UNSTABLE', count: 3, cycle: 6000}], timeLimit: 200, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.008 } }, { type: 'RASTREADOR', count: 1, params: { speed: 3200 } }] },
+                    { level: 9, commandCategory: 'LEN_11', gridSize: 45, specialBlocks: [{ type: 'T-PORT', count: 2, id: 1, color: '#A43BFF' }, { type: 'SOLID', count: 7 }], timeLimit: 220, enemies: [{ type: 'RASTREADOR', count: 2, params: {speed: 3500} }] },
+                    { level: 10, commandCategory: 'LEN_11', gridSize: 44, specialBlocks: [{ type: 'SLOW', count: 5 }, { type: 'SOLID', count: 3 }, {type: 'UNSTABLE', count: 4, cycle: 3000}], timeLimit: 240, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.009 } }, { type: 'RASTREADOR', count: 1, params: { speed: 2800 } }] },
+                    { level: 11, commandCategory: 'LEN_12_PLUS', gridSize: 42, specialBlocks: [{ type: 'T-PORT', count: 2, id: 3, color: '#FFC700' }, { type: 'SOLID', count: 3 }, {type: 'BOOST', count: 4}], timeLimit: 260, enemies: [{ type: 'RASTREADOR', count: 2, params: { speed: 3000 } }] },
+                    { level: 12, commandCategory: 'LEN_12_PLUS', gridSize: 40, specialBlocks: [{ type: 'SLOW', count: 1 }, { type: 'SOLID', count: 1 }, { type: 'T-PORT', count: 2, id: 5, color: '#00FF8A' }, {type: 'UNSTABLE', count: 5, cycle: 5000}], timeLimit: 280, enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.01 } }, { type: 'RASTREADOR', count: 2, params: { speed: 2500 } }] },
+                    { level: 13, commandCategory: 'LEN_12_PLUS', gridSize: 38, timeLimit: 300, specialBlocks: [{ type: 'SOLID', count: 8 }, { type: 'UNSTABLE', count: 4, cycle: 4000 }], enemies: [{ type: 'CORRUPTOR', count: 1, params: { speed: 4000 } }, { type: 'RASTREADOR', count: 2, params: { speed: 2800 } }] },
+                    { level: 14, commandCategory: 'LEN_12_PLUS', gridSize: 37, timeLimit: 320, specialBlocks: [{ type: 'T-PORT', count: 2, id: 1, color: '#A43BFF' }, { type: 'T-PORT', count: 2, id: 2, color: '#FFC700' }, { type: 'SOLID', count: 5 }], enemies: [{ type: 'PATRULLA', count: 2, params: { speed: 0.01 } }, { type: 'RASTREADOR', count: 1, params: { speed: 2500 } }] },
+                    { level: 15, commandCategory: 'LEN_12_PLUS', gridSize: 36, timeLimit: 340, specialBlocks: [{ type: 'SLOW', count: 10 }, { type: 'SOLID', count: 5 }], enemies: [{ type: 'CORRUPTOR', count: 2, params: { speed: 4500 } }, { type: 'RASTREADOR', count: 2, params: { speed: 2600 } }] },
+                    { level: 16, commandCategory: 'LEN_12_PLUS', gridSize: 35, timeLimit: 360, specialBlocks: [{ type: 'UNSTABLE', count: 10, cycle: 2500 }], enemies: [{ type: 'PATRULLA', count: 1, params: { speed: 0.012 } }, { type: 'RASTREADOR', count: 2, params: { speed: 2200 } }] },
+                    { level: 17, commandCategory: 'LEN_12_PLUS', gridSize: 34, timeLimit: 380, specialBlocks: [{ type: 'SOLID', count: 10 }, { type: 'T-PORT', count: 2, id: 6, color: '#00FF8A' }], enemies: [{ type: 'CORRUPTOR', count: 1, params: { speed: 3500 } }, { type: 'RASTREADOR', count: 3, params: { speed: 2500 } }] },
+                    { level: 18, commandCategory: 'LEN_12_PLUS', gridSize: 33, timeLimit: 400, specialBlocks: [{ type: 'SLOW', count: 6 }, { type: 'SOLID', count: 6 }, { type: 'UNSTABLE', count: 6, cycle: 3000 }, { type: 'T-PORT', count: 2, id: 7, color: '#FF1A4B' }], enemies: [{ type: 'PATRULLA', count: 2, params: { speed: 0.011 } }, { type: 'RASTREADOR', count: 3, params: { speed: 2300 } }] }
+                ]
+            };
 
-            function getDefaultData() {
-                return {
-                    playerName: '',
-                    levels: GameState.getAllLevels().map(function(level) {
-                        return {
-                            number: level.number,
-                            unlocked: level.number === 1,
-                            stars: 0,
-                            bestScore: 0,
-                            completed: false
-                        };
-                    }),
-                    totalStars: 0,
-                    soundEnabled: true,
-                    colorPalette: 'cyan',
-                    numpadStyle: 'standard'
-                };
-            }
 
-            return {
-                save: function(data) {
-                    if (!isLocalStorageAvailable()) {
-                        console.warn('localStorage no disponible');
-                        return false;
+            const SHOP_ITEMS = {
+                shield: { name: "ESCUDO DE ENERGIA", desc: "Absorbe una colision con una entidad hostil.", cost: 2500, keyHint: '1' },
+                bypass: { name: "CHIP DE OMISION", desc: "Marca la siguiente letra requerida como 'recogida'.", cost: 4000, keyHint: '2' },
+                speed: { name: "SOBRECARGA TEMPORAL", desc: "Aumenta la velocidad del operador por 5 segundos.", cost: 1500, keyHint: '3' }
+            };
+            const ACHIEVEMENT_DATA = {
+                'NOVICE': { name: 'NOVATO', desc: 'Completa tu primer nivel.' },
+                'FIELD_EXPLORER': { name: 'EXPLORADOR DE CAMPO ABIERTO', desc: 'Completa los 18 niveles del Modo Campo Abierto.' },
+                'TYCOON': { name: 'MAGNATE', desc: 'Acumula 100,000 puntos totales.' },
+                'COLLECTOR': { name: 'COLECCIONISTA', desc: 'Compra al menos un item de cada tipo en el Terminal.' }
+            };
+
+            const PALETTES = { 'CODIGO_CIAN': { bg: '#08080A', text: '#B0B4C0', accent: '#00FFFF', error: '#FF1A4B' }, 'VOLCAN_FUEGO': { bg: '#100505', text: '#D6C2C2', accent: '#FF1A4B', error: '#E8FF3B' }, 'JUNGLA_SECRETA': { bg: '#051007', text: '#C2D6C7', accent: '#00FF41', error: '#FF6B00' }, 'GALAXIA_PURPURA': { bg: '#0C0510', text: '#CEC2D6', accent: '#A43BFF', error: '#3BFFF8' }, 'TESORO_DORADO': { bg: '#1A1405', text: '#E0D6C2', accent: '#FFC700', error: '#FF3B3B' }, 'OCEANO_PROFUNDO': { bg: '#050C1A', text: '#C2D0E0', accent: '#007BFF', error: '#FFA500' }, 'NEON_ELECTRICO': { bg: '#000010', text: '#B0B0FF', accent: '#39FF14', error: '#FF007F' }, 'AURORA_BOREAL': { bg: '#001018', text: '#CCEFFF', accent: '#00FFD5', error: '#FF00D5' }, };
+            const PALETTE_ORDER = Object.keys(PALETTES);
+            const state = { currentView: 'preload', operatorName: '', currentMode: null, isShiftActive: false, soundOn: true, currentPaletteIndex: 0, dpadVisible: true, playerData: { totalPoints: 0, inventory: {}, stats: {}, achievements: {} } };
+            const dom = {
+                body: document.body,
+                windows: { preload: document.getElementById('preload'), title: document.getElementById('title'), profiles: document.getElementById('profiles'), player: document.getElementById('player'), mainMenu: document.getElementById('mainMenu'), terminal: document.getElementById('terminal'), stats: document.getElementById('stats'), game: document.getElementById('game'), victory: document.getElementById('victory') },
+                profileGrid: document.getElementById('profile-grid'),
+                playerNameOutput: document.getElementById('player-name-output'), virtualKeyboard: document.getElementById('virtualKeyboard'), keyboardWrapper: document.getElementById('keyboard-wrapper'),
+                mainMenuPlayerName: document.getElementById('mainMenu-player-name'), mainMenuTotalPoints: document.getElementById('mainMenu-total-points'), mainMenuTitle: document.getElementById('mainMenu-title'), levelGrid: document.getElementById('level-grid'),
+                terminalTotalPoints: document.getElementById('terminal-total-points'), shopItemsContainer: document.getElementById('shop-items-container'),
+                statsDisplay: document.getElementById('stats-display'), achievementsGrid: document.getElementById('achievements-grid'),
+                gameHud: {
+                    container: document.getElementById('game-hud'),
+                    target: document.getElementById('hud-target'),
+                    playerLevel: document.getElementById('hud-player-level')
+                }, 
+                sideHud: {
+                    score: document.getElementById('side-hud-score'),
+                    moves: document.getElementById('side-hud-moves'),
+                    total: document.getElementById('side-hud-total'),
+                    combo: document.getElementById('side-hud-combo')
+                },
+                digitalTimer: document.getElementById('digital-timer'),
+                gameCanvas: document.getElementById('game-canvas'),
+                minimapCanvas: document.getElementById('minimap-canvas'),
+                itemHudContainer: document.getElementById('item-hud-container'),
+                matrixCanvas: document.getElementById('matrix-canvas'),
+                gameCanvasWrapper: document.getElementById('game-canvas-wrapper'),
+                dpadContainer: document.getElementById('dpad-container'), dpadBtns: document.querySelectorAll('.dpad-btn'),
+                settingsButton: document.getElementById('settings-button'), settingsPanel: document.getElementById('settings-panel'),
+                soundBtn: document.getElementById('sound-btn'), paletteBtn: document.getElementById('palette-btn'),
+                dpadSettingsBtn: document.getElementById('dpad-settings-btn'),
+                changePlayerBtn: document.getElementById('change-player-btn'), exitBtn: document.getElementById('exit-btn'),
+                fullscreenEnforcer: document.getElementById('fullscreen-enforcer'),
+                a11yLiveRegion: document.getElementById('a11y-live-region'),
+            };
+
+            function announce(message) { if (dom.a11yLiveRegion) { dom.a11yLiveRegion.textContent = message; } }
+
+            const storage = {
+                loadProfiles: () => { try { const d = localStorage.getItem('analyzer:profiles'); return d ? JSON.parse(d) : []; } catch(e) { return []; } },
+                saveProfiles: (profiles) => { try { localStorage.setItem('analyzer:profiles', JSON.stringify(profiles)); } catch(e) {} },
+                saveProfile: (name) => { const profiles = storage.loadProfiles(); if (!profiles.includes(name)) { profiles.push(name); storage.saveProfiles(profiles); } },
+                deleteProfile: (name) => { let profiles = storage.loadProfiles(); profiles = profiles.filter(p => p !== name); storage.saveProfiles(profiles); localStorage.removeItem(`analyzer:playerData:${name}`); ['OPEN_FIELD'].forEach(mode => { for (let i=1; i<=18; i++) { localStorage.removeItem(`analyzer:level_done:${mode}:${i}:${name}`); localStorage.removeItem(`analyzer:highscore:${mode}:${i}:${name}`); } }); },
+                loadPlayerData: (name) => { try { const d = localStorage.getItem(`analyzer:playerData:${name}`); const data = d ? JSON.parse(d) : { totalPoints: 0, inventory: {}, stats: {}, achievements: {} }; if (!data.inventory) data.inventory = {}; if (!data.stats) data.stats = { timePlayed: 0, levelsCompleted_OPEN_FIELD: 0 }; if (!data.achievements) data.achievements = {}; return data; } catch(e) { return { totalPoints: 0, inventory: {}, stats: {}, achievements: {} }; } },
+                savePlayerData: (name, data) => { try { localStorage.setItem(`analyzer:playerData:${name}`, JSON.stringify(data)); } catch(e) {} },
+                markLevelAsDone: (mode, level, name) => { try { localStorage.setItem(`analyzer:level_done:${mode}:${level}:${name}`, '1'); } catch(e) {} },
+                isLevelDone: (mode, level, name) => { try { return localStorage.getItem(`analyzer:level_done:${mode}:${level}:${name}`) === '1'; } catch(e) { return false; } },
+                getHighscore: (mode, level, name) => { try { return parseInt(localStorage.getItem(`analyzer:highscore:${mode}:${level}:${name}`), 10) || 0; } catch(e) { return 0; } },
+                setHighscore: (mode, level, name, score) => { try { const current = storage.getHighscore(mode, level, name); if (score > current) { localStorage.setItem(`analyzer:highscore:${mode}:${level}:${name}`, score); } } catch(e) {} },
+                saveSoundPref: (isOn) => { try { localStorage.setItem('analyzer:soundOn', isOn ? '1' : '0'); } catch(e) {} },
+                loadSoundPref: () => { try { return localStorage.getItem('analyzer:soundOn') !== '0'; } catch(e) { return true; } },
+                savePalette: (name) => { try { localStorage.setItem('analyzer:palette', name); } catch(e) {} },
+                loadPalette: () => { try { return localStorage.getItem('analyzer:palette') || 'CODIGO_CIAN'; } catch(e) { return 'CODIGO_CIAN'; } },
+                saveDpadPref: (isVisible) => { try { localStorage.setItem('analyzer:dpadVisible', isVisible ? '1' : '0'); } catch(e) {} },
+                loadDpadPref: () => { try { const pref = localStorage.getItem('analyzer:dpadVisible'); if (pref === null) return false; return pref === '1'; } catch (e) { return false; } },
+                saveDpadPosition: (pos) => { try { localStorage.setItem('analyzer:dpadPosition', JSON.stringify(pos)); } catch(e) {} },
+                loadDpadPosition: () => { try { const d = localStorage.getItem('analyzer:dpadPosition'); return d ? JSON.parse(d) : null; } catch(e) { return null; } },
+                loadUsedWords: (name, category) => {
+                    try {
+                        const key = `analyzer:usedWords:${name}:${category}`;
+                        const data = localStorage.getItem(key);
+                        return data ? JSON.parse(data) : [];
+                    } catch (e) { return []; }
+                },
+                saveUsedWords: (name, category, words) => {
+                    try {
+                        const key = `analyzer:usedWords:${name}:${category}`;
+                        localStorage.setItem(key, JSON.stringify(words));
+                    } catch (e) {}
+                },
+            };
+
+            const statsManager = {
+                unlock: function(achievementId) { if (!state.playerData.achievements[achievementId]) { state.playerData.achievements[achievementId] = true; } },
+                checkAchievements: function() { const { stats, achievements, inventory, totalPoints } = state.playerData; if (!achievements['NOVICE'] && (stats.levelsCompleted_OPEN_FIELD || 0) > 0) { this.unlock('NOVICE'); } if (!achievements['FIELD_EXPLORER'] && (stats.levelsCompleted_OPEN_FIELD || 0) >= 18) { this.unlock('FIELD_EXPLORER'); } if (!achievements['TYCOON'] && totalPoints >= 100000) { this.unlock('TYCOON'); } if (!achievements['COLLECTOR']) { if ((inventory.shield || 0) > 0 && (inventory.bypass || 0) > 0 && (inventory.speed || 0) > 0) { this.unlock('COLLECTOR'); } } },
+                logEvent: function(eventName, data = {}) { const { stats } = state.playerData; if (eventName === 'GAME_TICK' && data.time) { stats.timePlayed = (stats.timePlayed || 0) + data.time; } if (eventName === 'LEVEL_COMPLETE') { const key = `levelsCompleted_${data.mode}`; stats[key] = (stats[key] || 0) + 1; } this.checkAchievements(); storage.savePlayerData(state.operatorName, state.playerData); }
+            };
+
+            const audioManager = {
+                ctx: null, isInitialized: false, masterGain: null,
+                init: function() { if(this.isInitialized) return; try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); this.masterGain = this.ctx.createGain(); this.masterGain.gain.value = 0.3; this.masterGain.connect(this.ctx.destination); this.isInitialized = true; } catch(e) { console.error("Web Audio API not supported."); } },
+                playSound: function(type) { if (!this.isInitialized || !state.soundOn) return; const now = this.ctx.currentTime; const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.connect(g); g.connect(this.masterGain); switch(type) { case 'spawn': o.type = 'sine'; o.frequency.setValueAtTime(100, now); o.frequency.exponentialRampToValueAtTime(1000, now + 0.1); g.gain.setValueAtTime(0.3, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.1); break; case 'move': o.type = 'sine'; o.frequency.setValueAtTime(800, now); g.gain.setValueAtTime(0.3, now); o.frequency.exponentialRampToValueAtTime(1200, now + 0.05); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05); break; case 'collect': o.type = 'sine'; o.frequency.setValueAtTime(440, now); o.frequency.exponentialRampToValueAtTime(880, now + 0.1); g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.1); break; case 'complete': o.type = 'sawtooth'; o.frequency.setValueAtTime(523.25, now); g.gain.setValueAtTime(0.4, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.5); setTimeout(() => this.playTone(659.25, 0.5), 100); setTimeout(() => this.playTone(783.99, 0.5), 200); break; case 'click': o.type = 'sine'; o.frequency.setValueAtTime(600, now); g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.05); break; case 'error': o.type = 'sawtooth'; o.frequency.setValueAtTime(160, now); o.frequency.exponentialRampToValueAtTime(80, now + 0.2); g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.2); break; case 'teleport': o.type = 'square'; o.frequency.setValueAtTime(200, now); o.frequency.exponentialRampToValueAtTime(1000, now + 0.15); g.gain.setValueAtTime(0.4, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.15); break; case 'powerup': o.type = 'triangle'; o.frequency.setValueAtTime(880, now); g.gain.setValueAtTime(0.5, now); g.gain.exponentialRampToValueAtTime(0.0001, now + 0.2); break; } o.start(now); o.stop(now + 0.3); },
+                playTone: function(freq, dur) { if(!this.isInitialized || !state.soundOn) return; const now = this.ctx.currentTime; const o = this.ctx.createOscillator(); const g = this.ctx.createGain(); o.type = 'sawtooth'; o.connect(g); g.connect(this.masterGain); o.frequency.setValueAtTime(freq, now); g.gain.setValueAtTime(0.4, now); g.gain.exponentialRampToValueAtTime(0.0001, now + dur); o.start(now); o.stop(now + dur); }
+            };
+            
+            function fnv1a(str) { let hash = 0x811c9dc5; for (let i = 0; i < str.length; i++) { hash ^= str.charCodeAt(i); hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24); } return hash >>> 0; }
+            function mulberry32(seed) { return function() { let t = seed += 0x6D2B79F5; t = Math.imul(t ^ t >>> 15, t | 1); t ^= t + Math.imul(t ^ t >>> 7, t | 61); return ((t ^ t >>> 14) >>> 0) / 4294967296; } }
+            
+            function formatNumber(num, length = 4) { return String(num).padStart(length, '0'); }
+            function applyPalette(paletteName) { const palette = PALETTES[paletteName]; if (!palette) return; const root = document.documentElement; root.style.setProperty('--color-background-primary', palette.bg); root.style.setProperty('--color-text-passive', palette.text); root.style.setProperty('--color-accent-primary', palette.accent); root.style.setProperty('--color-accent-error', palette.error); const paletteIndex = PALETTE_ORDER.indexOf(paletteName); if (paletteIndex !== -1) state.currentPaletteIndex = paletteIndex; }
+            async function requestFullscreen() { if (document.fullscreenElement) return; try { await document.documentElement.requestFullscreen(); } catch (err) {} }
+
+            function navigateTo(viewName) {
+                if (!dom.windows[viewName]) { return; }
+                const oldView = dom.windows[state.currentView]; if (oldView) oldView.classList.remove('active');
+                state.currentView = viewName; const newView = dom.windows[viewName]; newView.classList.add('active');
+                
+                const isGameOrMenu = (viewName === 'mainMenu' || viewName === 'game' || viewName === 'terminal' || viewName === 'stats');
+                dom.settingsButton.style.display = isGameOrMenu ? 'flex' : 'none';
+                if (!isGameOrMenu) { dom.settingsPanel.style.display = 'none'; }
+
+                if (viewName === 'profiles') { generateProfileCards(); }
+                else if (viewName === 'player') { state.operatorName = ''; updatePlayerNameDisplay(); resizeKeyboard(); } 
+                else if (viewName === 'mainMenu') { dom.mainMenuPlayerName.textContent = state.operatorName; dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints; dom.mainMenuTitle.textContent = `MENU NIVELES: ${state.currentMode}`; generateLevelButtons(); }
+                else if (viewName === 'terminal') { populateTerminal(); }
+                else if (viewName === 'stats') { populateStatsScreen(); }
+            }
+            
+            function populateTerminal() { dom.terminalTotalPoints.textContent = state.playerData.totalPoints; const container = dom.shopItemsContainer; container.innerHTML = ''; for (const id in SHOP_ITEMS) { const item = SHOP_ITEMS[id]; const currentAmount = state.playerData.inventory[id] || 0; const itemEl = document.createElement('div'); itemEl.className = 'shop-item'; const canAfford = state.playerData.totalPoints >= item.cost; itemEl.innerHTML = `<h3>${item.name} [${currentAmount}]</h3><p class="shop-item-details">${item.desc}</p><div class="shop-item-footer"><span class="shop-item-cost">${item.cost} P</span><button class="big-button buy-btn ${canAfford ? '' : 'disabled'}" data-item-id="${id}">COMPRAR</button></div>`; container.appendChild(itemEl); } }
+            function populateStatsScreen() { const { stats, achievements } = state.playerData; const statsContainer = dom.statsDisplay; const achievementsContainer = dom.achievementsGrid; const timePlayed = stats.timePlayed || 0; const minutes = Math.floor(timePlayed / 60000); const seconds = Math.floor((timePlayed % 60000) / 1000).toString().padStart(2, '0'); statsContainer.innerHTML = `<div class="stat-card">TIEMPO DE JUEGO<div class="value">${minutes}:${seconds}</div></div><div class="stat-card">PUNTOS TOTALES<div class="value">${state.playerData.totalPoints}</div></div><div class="stat-card">NIVELES CAMPO ABIERTO<div class="value">${stats.levelsCompleted_OPEN_FIELD || 0} / 12</div></div>`; achievementsContainer.innerHTML = ''; for (const id in ACHIEVEMENT_DATA) { const ach = ACHIEVEMENT_DATA[id]; const isUnlocked = achievements[id]; const card = document.createElement('div'); card.className = `achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`; card.innerHTML = `<h3>${ach.name}</h3><p>${ach.desc}</p>`; achievementsContainer.appendChild(card); } }
+            function resizeKeyboard() { const GAP_SIZE = 8; const container = dom.keyboardWrapper; const keySizeFromWidth = (container.clientWidth - (7 * GAP_SIZE)) / 8; const keySizeFromHeight = (container.clientHeight - (3 * GAP_SIZE)) / 4; const finalKeySize = Math.floor(Math.min(keySizeFromWidth, keySizeFromHeight)); dom.virtualKeyboard.style.setProperty('--k', `${finalKeySize}px`); dom.virtualKeyboard.style.setProperty('--gap', `${GAP_SIZE}px`); }
+            const keyboardLayout = [ ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', '<-'], ['A', 'S', 'D', 'F', 'G', 'H', {key: 'ENTER', span: 2}], ['I', 'J', 'K', 'L', 'M', 'Ñ', 'O', 'P'], [{key: 'SHIFT', span: 2}, 'Z', 'X', 'C', 'V', 'B', 'N'] ];
+            function createVirtualKeyboard() { dom.virtualKeyboard.innerHTML = ''; keyboardLayout.flat().forEach(kI => { const kE = document.createElement('button'); kE.classList.add('key'); const k = (typeof kI === 'object') ? kI.key : kI; kE.textContent = k; kE.dataset.key = k; kE.id = `key-${k.toLowerCase()}`; if (typeof kI === 'object' && kI.span) { kE.classList.add(`span${kI.span}`); } if (['<-', 'ENTER', 'SHIFT'].includes(k)) { kE.classList.add('funckey'); } dom.virtualKeyboard.appendChild(kE); }); }
+            function handleKeyPress(key) { 
+                if (key === 'ENTER') { 
+                    if (state.operatorName.length > 0) {
+                        state.playerData = storage.loadPlayerData(state.operatorName); 
+                        if (state.operatorName.toUpperCase() === 'HACKERMAN' || state.operatorName.toUpperCase() === 'GHOST') {
+                            state.playerData.isLegendary = true;
+                        }
+                        storage.saveProfile(state.operatorName);
+                        state.currentMode = 'OPEN_FIELD'; 
+                        navigateTo('mainMenu'); 
+                    } 
+                } else if (key === 'SHIFT') { 
+                    state.isShiftActive = !state.isShiftActive; document.getElementById('key-shift').classList.toggle('active', state.isShiftActive); 
+                } else if (key === '<-') { 
+                    state.operatorName = state.operatorName.slice(0, -1); 
+                } else if (state.operatorName.length < 20) { 
+                    const char = state.isShiftActive ? key.toUpperCase() : key.toLowerCase(); 
+                    state.operatorName += char; 
+                } 
+                if (key !== 'SHIFT' && state.isShiftActive) { 
+                    state.isShiftActive = false; 
+                    document.getElementById('key-shift').classList.remove('active'); 
+                } 
+                updatePlayerNameDisplay(); 
+            }
+            function updatePlayerNameDisplay() { dom.playerNameOutput.textContent = state.operatorName; }
+            function generateProfileCards() { dom.profileGrid.innerHTML = ''; const profiles = storage.loadProfiles(); profiles.forEach(name => { const card = document.createElement('button'); card.classList.add('profile-card'); card.dataset.name = name; const nameSpan = document.createElement('span'); nameSpan.textContent = name; card.appendChild(nameSpan); const deleteBtn = document.createElement('button'); deleteBtn.classList.add('delete-profile-btn'); deleteBtn.textContent = 'X'; deleteBtn.dataset.name = name; deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); storage.deleteProfile(name); generateProfileCards(); }); card.appendChild(deleteBtn); dom.profileGrid.appendChild(card); }); }
+            
+            function generateLevelButtons() {
+                dom.levelGrid.innerHTML = '';
+                const levels = LEVEL_CONFIG[state.currentMode];
+                if (!levels) return;
+                const lockSVG = `<svg class="lock-icon" viewBox="0 0 24 24"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6z"></path></svg>`;
+                
+                levels.forEach(levelData => {
+                    const btn = document.createElement('button');
+                    btn.classList.add('level-button');
+                    btn.dataset.level = levelData.level;
+
+                    const isCompleted = storage.isLevelDone(state.currentMode, levelData.level, state.operatorName);
+                    const isUnlocked = (levelData.level === 1) || storage.isLevelDone(state.currentMode, levelData.level - 1, state.operatorName);
+
+                    if (isUnlocked) {
+                        btn.textContent = levelData.level.toString().padStart(2, '0');
+                        if (isCompleted) {
+                            btn.classList.add('completed');
+                        }
+                    } else {
+                        btn.classList.add('locked');
+                        btn.disabled = true;
+                        btn.innerHTML = lockSVG;
                     }
 
-                    try {
-                        var mergedData = this.load();
-                        for (var key in data) {
-                            if (data.hasOwnProperty(key)) {
-                                mergedData[key] = data[key];
+                    const highscoreSpan = document.createElement('span');
+                    highscoreSpan.className = 'highscore';
+                    const highscore = storage.getHighscore(state.currentMode, levelData.level, state.operatorName);
+                    if (highscore > 0) {
+                        highscoreSpan.textContent = `HS: ${highscore}`;
+                    }
+                    if(isUnlocked){
+                        btn.appendChild(highscoreSpan);
+                    }
+                    dom.levelGrid.appendChild(btn);
+                });
+            }
+
+            const matrixEffect = {
+                ctx: null, cols: 0, drops: [],
+                charset: 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン',
+                fontSize: 16,
+                init: function() {
+                    this.ctx = dom.matrixCanvas.getContext('2d');
+                    this.resize();
+                    window.addEventListener('resize', () => this.resize());
+                },
+                resize: function() {
+                    this.ctx.canvas.width = window.innerWidth;
+                    this.ctx.canvas.height = window.innerHeight;
+                    this.cols = Math.floor(this.ctx.canvas.width / this.fontSize);
+                    this.drops = [];
+                    for (let i = 0; i < this.cols; i++) { this.drops[i] = 1; }
+                },
+                draw: function() {
+                    if (state.currentView === 'game') {
+                        this.ctx.fillStyle = '#000'; // Clear canvas in game view
+                        this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                        return;
+                    }
+
+                    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+                    this.ctx.fillRect(0, 0, this.ctx.canvas.width, this.ctx.canvas.height);
+                    
+                    this.ctx.font = this.fontSize + 'px ' + getComputedStyle(document.body).getPropertyValue('--font-family');
+                    
+                    for (let i = 0; i < this.drops.length; i++) {
+                        const text = this.charset[Math.floor(Math.random() * this.charset.length)];
+                        
+                        // Head of the drop is bright
+                        if (this.drops[i] * this.fontSize > this.ctx.canvas.height && Math.random() > 0.975) {
+                            this.drops[i] = 0;
+                        }
+                        
+                        this.ctx.fillStyle = (this.drops[i] === Math.floor(this.ctx.canvas.height / this.fontSize * Math.random() * 0.75)) ? '#c8ffe7' : getComputedStyle(document.body).getPropertyValue('--color-accent-bios');
+
+                        this.ctx.fillText(text, i * this.fontSize, this.drops[i] * this.fontSize);
+                        this.drops[i]++;
+                    }
+                }
+            };
+
+            const game = {
+                ctx: null, board: {}, player: {}, state: {}, 
+                letters: [], enemies: [], keys: {ArrowUp:false,ArrowDown:false,ArrowLeft:false,ArrowRight:false,w:false,a:false,s:false,d:false}, 
+                isInitialized: false, prng: null, currentConfig: {},
+                letterCache: {}, specialBlocks: [], levelInventory: {},
+                trail: [], lastUpdateTime: 0,
+                targetZones: [], stateStack: [], checkpoint: null,
+                teleportCooldowns: {}, energyPulses: [], floatingTexts: [],
+                minimapCtx: null,
+                
+                init: function() { 
+                    if (this.isInitialized) return; 
+                    this.ctx = dom.gameCanvas.getContext('2d');
+                    this.minimapCtx = dom.minimapCanvas.getContext('2d');
+                    new ResizeObserver(() => { this.resizeCanvas(); }).observe(dom.gameCanvasWrapper); 
+                    this.isInitialized = true; 
+                },
+                shuffleArray: function(array) { for (let i = array.length - 1; i > 0; i--) { const j = Math.floor(this.prng() * (i + 1)); [array[i], array[j]] = [array[j], array[i]]; } },
+                createLetterImage: function(char, color) { const font_family = getComputedStyle(document.body).getPropertyValue('--font-family'); const svgString = `<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><text x="50%" y="50%" font-size="95" font-family="${font_family}" font-weight="bold" fill="${color}" text-anchor="middle" dominant-baseline="central">${char}</text></svg>`; const blob = new Blob([svgString], {type: 'image/svg+xml;charset=utf-8'}); const url = URL.createObjectURL(blob); const image = new Image(); const promise = new Promise((resolve) => { image.onload = () => { URL.revokeObjectURL(url); resolve(image); }; image.onerror = () => { resolve(null); }; }); image.src = url; return promise; },
+                preloadLevelAssets: async function() { this.letterCache = {}; const commandChars = [...new Set(this.currentConfig.command)]; const colors = ['yellow', getComputedStyle(document.body).getPropertyValue('--color-accent-bios')]; const promises = []; for(const char of commandChars) { for(const color of colors) { const key = `${char}_${color}`; promises.push(this.createLetterImage(char, color).then(img => { this.letterCache[key] = img; })); } } await Promise.all(promises);},
+                
+                start: async function(levelNumber) {
+                    const level = LEVEL_CONFIG[state.currentMode]?.find(l => l.level === levelNumber);
+                    if (!level) return;
+                    this.currentConfig = { ...level };
+                    this.levelInventory = JSON.parse(JSON.stringify(state.playerData.inventory));
+                    
+                    const commandCategory = this.currentConfig.commandCategory;
+                    const allWordsForCategory = WORD_BANK[commandCategory];
+
+                    let usedWords = storage.loadUsedWords(state.operatorName, commandCategory);
+                    let availableWords = allWordsForCategory.filter(word => !usedWords.includes(word));
+
+                    if (availableWords.length === 0) {
+                        availableWords = allWordsForCategory;
+                        usedWords = [];
+                    }
+
+                    const randomIndex = Math.floor(Math.random() * availableWords.length);
+                    const chosenWord = availableWords[randomIndex];
+                    this.currentConfig.command = chosenWord;
+
+                    usedWords.push(chosenWord);
+                    storage.saveUsedWords(state.operatorName, commandCategory, usedWords);
+                    
+                    const seed = fnv1a(`${state.operatorName}|${state.currentMode}|${levelNumber}`);
+                    this.prng = mulberry32(seed);
+
+                    state.currentLevel = levelNumber;
+                    navigateTo('game');
+                    await this.preloadLevelAssets();
+                    requestAnimationFrame(() => this.resizeCanvas(true));
+                },
+
+                reset: function() { 
+                    audioManager.playSound('error');
+                    this.state = { score: 0, deliveredCount: 0, moveCount: 0, levelTimeRemaining: (this.currentConfig.timeLimit || 90) * 1000, comboCounter: 1, lastDeliveryTime: 0, enemySpeedMultiplier: 1.0 }; 
+                    this.trail = []; this.energyPulses = []; this.enemies = []; this.stateStack = []; this.teleportCooldowns = {}; this.floatingTexts = [];
+                    this.checkpoint = null;
+                    dom.body.classList.remove('panic-mode');
+                    this.setupLevel(); 
+                },
+                resetPlayerPosition: function(isInitialSetup = false) {
+                    const gridSize = this.currentConfig.gridSize;
+                    const startPos = (this.checkpoint && this.checkpoint.playerPos) ? this.checkpoint.playerPos : {col: this.player.initialCol, row: this.player.initialRow};
+
+                    this.player = { ...this.player, col: startPos.col, row: startPos.row, targetCol: startPos.col, targetRow: startPos.row, animX: startPos.col * gridSize, animY: startPos.row * gridSize, isMoving: false, animProgress: 0, moveDuration: CONFIG.PLAYER_MOVE_DURATION, wasHit: false, isInvincible: true, invincibilityTimer: CONFIG.PLAYER_INVINCIBILITY_TICKS };
+                    if (isInitialSetup) { this.trail = []; }
+                },
+                
+                setupLevel: function() {
+                    let availableCells = [];
+                    for (let r = 0; r < this.board.rows; r++) { for (let c = 0; c < this.board.cols; c++) { availableCells.push({ col: c, row: r }); } }
+                    
+                    availableCells = availableCells.filter(cell => cell.col > 0 && cell.col < this.board.cols - 1 && cell.row > 0 && cell.row < this.board.rows - 1 );
+                    
+                    const command = this.currentConfig.command;
+                    const centerX = Math.floor(this.board.cols / 2);
+                    const centerY = Math.floor(this.board.rows / 2);
+                    const startX = centerX - Math.floor(command.length / 2);
+                    
+                    const reservedCells = [];
+                    for (let i = 0; i < command.length; i++) {
+                        reservedCells.push({ col: startX + i, row: centerY });
+                    }
+
+                    this.placeTargetZones(reservedCells);
+                    
+                    availableCells = availableCells.filter(ac => !this.targetZones.some(tz => tz.col === ac.col && tz.row === ac.row));
+
+                    this.shuffleArray(availableCells);
+
+                    if (availableCells.length === 0) { console.error("FATAL: Not enough available cells for player."); return; }
+                    
+                    const playerStartPos = availableCells.pop();
+                    this.player.initialCol = playerStartPos.col; this.player.initialRow = playerStartPos.row;
+                    this.resetPlayerPosition(true);
+                    
+                    this.letters = [];
+                    this.enemies = [];
+                    
+                    this.placeSpecialBlocks(availableCells);
+                    this.spawnEntitiesWithAnimation(availableCells);
+                },
+
+                spawnEntitiesWithAnimation: function(availableCells) {
+                    const command = this.currentConfig.command;
+                    const gridSize = this.currentConfig.gridSize;
+                    
+                    for (let i = 0; i < command.length; i++) {
+                        if (availableCells.length === 0) break;
+                        const pos = availableCells.pop();
+                        this.letters.push({ 
+                            char: command[i], col: pos.col, row: pos.row, isMoving: false, 
+                            targetCol: pos.col, targetRow: pos.row, animX: pos.col * gridSize, animY: pos.row * gridSize, 
+                            animProgress: 0, spawnProgress: 0, isSpawning: true, corruptedTimer: 0
+                        });
+                    }
+
+                    if (!this.currentConfig.enemies) return;
+                    this.currentConfig.enemies.forEach(enemyConfig => {
+                        for (let i = 0; i < (enemyConfig.count || 1); i++) {
+                            if (availableCells.length === 0) break;
+                            const pos = availableCells.pop();
+                            let patrolParams = {...enemyConfig.params};
+                            if (enemyConfig.type === 'PATRULLA') {
+                                patrolParams.startX = pos.col;
+                                patrolParams.startY = pos.row;
+                                patrolParams.endX = pos.col; 
+                                patrolParams.endY = pos.row;
+                            }
+                            this.enemies.push({ 
+                                type: enemyConfig.type, params: patrolParams, col: pos.col, row: pos.row, 
+                                animX: pos.col * gridSize, animY: pos.row * gridSize, 
+                                direction: 1, lastMoveTime: 0, spawnProgress: 0, isSpawning: true
+                            });
+                        }
+                    });
+
+                    [...this.letters, ...this.enemies].forEach((entity, index) => {
+                        setTimeout(() => {
+                           entity.isSpawning = true;
+                           audioManager.playSound('spawn');
+                        }, index * 100); 
+                    });
+                },
+
+                placeTargetZones: function(suggestedCells) {
+                    this.targetZones = [];
+                    const command = this.currentConfig.command;
+                    for (let i = 0; i < command.length; i++) {
+                        let cell = suggestedCells[i];
+                        if (!cell || cell.col < 1 || cell.col >= this.board.cols - 1) {
+                            const newCol = Math.max(1, Math.min(cell ? cell.col : 1, this.board.cols - 2));
+                             console.warn(`[LEVEL GEN WARN] Target zone for char "${command[i]}" was out of bounds. Clamping column to ${newCol}.`);
+                            cell = { col: newCol, row: cell.row };
+                        }
+                        this.targetZones.push({ char: command[i], col: cell.col, row: cell.row, satisfied: false });
+                    }
+                },
+                placeSpecialBlocks: function(availableCells) {
+                    this.specialBlocks = [];
+                    if (!this.currentConfig.specialBlocks) return;
+                    this.currentConfig.specialBlocks.forEach(blockConfig => {
+                        const count = blockConfig.count || 1;
+                        for (let i = 0; i < count; i++) {
+                            if (availableCells.length === 0) { break; }
+                            const pos = availableCells.pop();
+                            const newBlock = { type: blockConfig.type, col: pos.col, row: pos.row };
+                            if (blockConfig.type === 'UNSTABLE') {
+                                newBlock.cycle = blockConfig.cycle || 4000;
+                                newBlock.timer = newBlock.cycle / 2;
+                                newBlock.isActive = true;
+                            } else if (blockConfig.type === 'T-PORT') {
+                                newBlock.id = blockConfig.id;
+                                newBlock.color = blockConfig.color;
+                            }
+                            this.specialBlocks.push(newBlock);
+                        }
+                    });
+                },
+                resizeCanvas: function(isFirstTime = false) { 
+                    const w = dom.gameCanvasWrapper; 
+                    if (w.clientWidth === 0) return; 
+                    const gridSize = this.currentConfig.gridSize; 
+                    const mW = w.clientWidth - 20; const mH = w.clientHeight - 20; 
+                    this.board.cols = Math.floor(mW / gridSize); 
+                    this.board.rows = Math.floor(mH / gridSize); 
+                    dom.gameCanvas.width = this.board.cols * gridSize;
+                    dom.gameCanvas.height = this.board.rows * gridSize;
+                    if (isFirstTime) { this.reset(); }
+                },
+                
+                update: function(timestamp) {
+                    if (!this.lastUpdateTime) this.lastUpdateTime = timestamp;
+                    const timeDelta = timestamp - this.lastUpdateTime;
+                    if (timeDelta > 0 && timeDelta < 1000) {
+                        statsManager.logEvent('GAME_TICK', { time: timeDelta });
+                    }
+                    if (this.state.levelTimeRemaining > 0) {
+                        this.state.levelTimeRemaining -= timeDelta;
+                        const isInPanic = this.state.levelTimeRemaining < CONFIG.PANIC_MODE_THRESHOLD;
+                        if (isInPanic && !dom.body.classList.contains('panic-mode')) {
+                            dom.body.classList.add('panic-mode');
+                            this.state.enemySpeedMultiplier = CONFIG.PANIC_MODE_SPEED_MULTIPLIER;
+                        } else if (!isInPanic && dom.body.classList.contains('panic-mode')) {
+                            dom.body.classList.remove('panic-mode');
+                            this.state.enemySpeedMultiplier = 1.0;
+                        }
+                        
+                        if (this.state.levelTimeRemaining <= 0) {
+                            this.state.levelTimeRemaining = 0;
+                            announce("Tiempo agotado. Penalizacion aplicada. Reiniciando secuencia.");
+                            audioManager.playSound('error');
+                            this.state.score = Math.max(0, this.state.score - CONFIG.TIME_EXPIRED_PENALTY);
+                            this.reset();
+                            return;
+                        }
+                    }
+                    const minutes = Math.floor(Math.max(0, this.state.levelTimeRemaining) / 60000);
+                    const seconds = Math.floor((Math.max(0, this.state.levelTimeRemaining) % 60000) / 1000);
+                    dom.digitalTimer.textContent = `${formatNumber(minutes, 2)}:${formatNumber(seconds, 2)}`;
+                    dom.digitalTimer.style.color = this.state.levelTimeRemaining < CONFIG.PANIC_MODE_THRESHOLD ? 'var(--color-accent-error)' : 'var(--color-accent-primary)';
+
+                    this.updatePlayer(timestamp, timeDelta);
+                    this.updateLetters(timeDelta);
+                    this.updateSpecialBlocks(timeDelta);
+                    this.updateEnemies(timestamp);
+                    this.updateEnergyPulses(timeDelta);
+                    this.updateFloatingTexts(timeDelta);
+                    this.checkEnemyCollisions(timestamp);
+                    this.lastUpdateTime = timestamp;
+                },
+                updateLetters: function(timeDelta) {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.letters.forEach(letter => {
+                        if (letter.isSpawning) {
+                            letter.spawnProgress += timeDelta / 200; // 200ms spawn time
+                            if (letter.spawnProgress >= 1) {
+                                letter.spawnProgress = 1;
+                                letter.isSpawning = false;
                             }
                         }
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(mergedData));
-                        return true;
-                    } catch(e) {
-                        console.error('Error guardando datos:', e);
-                        return false;
+                        if (letter.corruptedTimer > 0) {
+                           letter.corruptedTimer -= timeDelta;
+                        }
+                        if (letter.isMoving) { 
+                            letter.animProgress += timeDelta; 
+                            const t = Math.min(letter.animProgress / CONFIG.LETTER_MOVE_DURATION, 1); 
+                            const startX = letter.col * gridSize; const startY = letter.row * gridSize; 
+                            const endX = letter.targetCol * gridSize; const endY = letter.targetRow * gridSize; 
+                            letter.animX = startX + (endX - startX) * t; letter.animY = startY + (endY - startY) * t; 
+                            if (t >= 1) { 
+                                letter.isMoving = false; letter.col = letter.targetCol; letter.row = letter.targetRow; 
+                                this.evaluateBoardState(this.lastUpdateTime); 
+                            } 
+                        }
+                    });
+                },
+                updateSpecialBlocks: function(timeDelta) {
+                    this.specialBlocks.forEach(b => {
+                        if (b.type === 'UNSTABLE') { b.timer -= timeDelta; if(b.timer <= 0) { b.isActive = !b.isActive; b.timer = b.cycle / 2; } }
+                    });
+                    for (const id in this.teleportCooldowns) { if (this.teleportCooldowns[id] > 0) { this.teleportCooldowns[id] -= timeDelta; } }
+                },
+                updatePlayer: function(timestamp, timeDelta) {
+                    if (this.player.isInvincible) { this.player.invincibilityTimer--; if (this.player.invincibilityTimer <= 0) { this.player.isInvincible = false; } }
+                    this.trail.forEach(p => p.life -= 0.08); this.trail = this.trail.filter(p => p.life > 0);
+                    if (this.player.isMoving) {
+                        this.player.animProgress += timeDelta; const t = Math.min(this.player.animProgress / this.player.moveDuration, 1); const gridSize = this.currentConfig.gridSize; const startX = this.player.col * gridSize; const startY = this.player.row * gridSize; const endX = this.player.targetCol * gridSize; const endY = this.player.targetRow * gridSize; this.player.animX = startX + (endX - startX) * t; this.player.animY = startY + (endY - startY) * t;
+                        if (t >= 1) { this.player.isMoving = false; this.player.col = this.player.targetCol; this.player.row = this.player.targetRow; this.checkSpecialBlocks(timestamp); }
+                    } else {
+                        let dx = 0, dy = 0;
+                        if (this.keys.ArrowUp || this.keys.w) dy = -1; else if (this.keys.ArrowDown || this.keys.s) dy = 1; else if (this.keys.ArrowLeft || this.keys.a) dx = -1; else if (this.keys.ArrowRight || this.keys.d) dx = 1;
+                        if (dx !== 0 || dy !== 0) {
+                            const targetCol = this.player.col + dx; const targetRow = this.player.row + dy;
+                            if (targetRow < 0 || targetRow >= this.board.rows || targetCol < 0 || targetCol >= this.board.cols) return;
+                            const isSolidBlock = this.specialBlocks.some(b => (b.type === 'SOLID' || (b.type === 'UNSTABLE' && b.isActive)) && b.col === targetCol && b.row === targetRow);
+                            if (isSolidBlock) { audioManager.playSound('error'); return; }
+                            const letterToPush = this.letters.find(l => !l.isMoving && l.col === targetCol && l.row === targetRow);
+                            if (letterToPush) {
+                                const pushTargetCol = targetCol + dx; const pushTargetRow = targetRow + dy;
+                                const isPushOutOfBounds = pushTargetRow < 0 || pushTargetRow >= this.board.rows || pushTargetCol < 0 || pushTargetCol >= this.board.cols;
+                                const isPushSolidBlock = this.specialBlocks.some(b => (b.type === 'SOLID' || (b.type === 'UNSTABLE' && b.isActive)) && b.col === pushTargetCol && b.row === pushTargetRow);
+                                const isAnotherLetter = this.letters.some(l => l.col === pushTargetCol && l.row === pushTargetRow);
+                                if (isPushOutOfBounds || isPushSolidBlock || isAnotherLetter) { audioManager.playSound('error'); return; }
+                                this.saveState();
+                                letterToPush.isMoving = true; letterToPush.animProgress = 0; letterToPush.targetCol = pushTargetCol; letterToPush.targetRow = pushTargetRow;
+                            } else { this.saveState(); }
+                            this.state.moveCount++; 
+                            this.trail.push({ x: this.player.col * this.currentConfig.gridSize, y: this.player.row * this.currentConfig.gridSize, life: 1.0, size: this.currentConfig.gridSize });
+                            if (this.trail.length > CONFIG.TRAIL_MAX_LENGTH) this.trail.shift();
+                            this.player.isMoving = true; this.player.animProgress = 0; this.player.targetCol = targetCol; this.player.targetRow = targetRow;
+                            audioManager.playSound('move');
+                        }
                     }
                 },
-
-                load: function() {
-                    if (!isLocalStorageAvailable()) {
-                        return getDefaultData();
+                updateEnemies: function(timestamp) {
+                    const gridSize = this.currentConfig.gridSize;
+                    const speedMultiplier = this.state.enemySpeedMultiplier || 1.0;
+                    this.enemies.forEach(e => {
+                        if (e.isSpawning) { e.spawnProgress += (timestamp - this.lastUpdateTime) / 200; if (e.spawnProgress >= 1) { e.spawnProgress = 1; e.isSpawning = false; } return; }
+                        if (e.type === 'PATRULLA') {
+                            const speed = e.params.speed * speedMultiplier;
+                            const t = (Math.sin(timestamp * speed) + 1) / 2;
+                            e.animX = (e.params.startX + (e.params.endX - e.params.startX) * t) * gridSize;
+                            e.animY = (e.params.startY + (e.params.endY - e.params.startY) * t) * gridSize;
+                            e.col = Math.round(e.animX / gridSize); e.row = Math.round(e.animY / gridSize);
+                        } else if (e.type === 'RASTREADOR' || e.type === 'CORRUPTOR') {
+                            const moveDelay = e.params.speed / speedMultiplier;
+                            if (timestamp > e.lastMoveTime + moveDelay) {
+                                let target = {col: this.player.col, row: this.player.row};
+                                if (e.type === 'CORRUPTOR') {
+                                    const availableLetters = this.letters.filter(l => !l.isMoving && l.corruptedTimer <= 0 && !this.targetZones.find(tz => tz.char === l.char && tz.satisfied));
+                                    if(availableLetters.length > 0) {
+                                        availableLetters.sort((a,b) => (Math.abs(a.col - e.col) + Math.abs(a.row - e.row)) - (Math.abs(b.col - e.col) + Math.abs(b.row - e.row)));
+                                        target = {col: availableLetters[0].col, row: availableLetters[0].row};
+                                    }
+                                }
+                                const isBlocked = (col, row) => {
+                                    if (col < 0 || col >= this.board.cols || row < 0 || row >= this.board.rows) return true;
+                                    const isLetter = this.letters.some(l => l.col === col && l.row === row);
+                                    const isSolid = this.specialBlocks.some(b => (b.type === 'SOLID' || (b.type === 'UNSTABLE' && b.isActive)) && b.col === col && b.row === row);
+                                    return isLetter || isSolid;
+                                };
+                                const dx = target.col - e.col; const dy = target.row - e.row;
+                                let nextCol = e.col; let nextRow = e.row;
+                                if (Math.abs(dx) > Math.abs(dy)) { 
+                                    if (dx !== 0 && !isBlocked(e.col + Math.sign(dx), e.row)) { nextCol += Math.sign(dx); } 
+                                    else if (dy !== 0 && !isBlocked(e.col, e.row + Math.sign(dy))) { nextRow += Math.sign(dy); }
+                                } else { 
+                                    if (dy !== 0 && !isBlocked(e.col, e.row + Math.sign(dy))) { nextRow += Math.sign(dy); }
+                                    else if (dx !== 0 && !isBlocked(e.col + Math.sign(dx), e.row)) { nextCol += Math.sign(dx); }
+                                }
+                                e.col = nextCol; e.row = nextRow;
+                                e.animX = e.col * gridSize; e.animY = e.row * gridSize;
+                                e.lastMoveTime = timestamp;
+                            }
+                        }
+                    });
+                },
+                checkEnemyCollisions: function(timestamp) {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.enemies.forEach(e => {
+                        if (e.isSpawning) return;
+                        if (e.type === 'CORRUPTOR') {
+                            const letterToCorrupt = this.letters.find(l => !l.isMoving && l.corruptedTimer <= 0 && l.col === e.col && l.row === e.row);
+                            if (letterToCorrupt) {
+                                letterToCorrupt.corruptedTimer = 5000; // 5 seconds
+                                audioManager.playSound('error');
+                                this.createFloatingText('// ALERTA: DATOS CORRUPTOS //', this.player.col, this.player.row, 'var(--color-accent-error)');
+                            }
+                        } else {
+                            if (this.player.isInvincible) return;
+                            const pBox = {x: this.player.animX, y: this.player.animY, size: gridSize * 0.8};
+                            const eBox = {x: e.animX, y: e.animY, size: gridSize * 0.8};
+                            if (pBox.x < eBox.x + eBox.size && pBox.x + pBox.size > eBox.x && pBox.y < eBox.y + eBox.size && pBox.y + pBox.size > eBox.y) {
+                                dom.body.classList.add('glitch');
+                                setTimeout(() => dom.body.classList.remove('glitch'), 300);
+                                this.player.wasHit = true;
+                                audioManager.playSound('error');
+                                announce('Hostil detectado. Reposicionando operador.');
+                                this.state.score = Math.max(0, this.state.score - CONFIG.ENEMY_HIT_PENALTY_SCORE);
+                                this.state.comboCounter = 1;
+                                this.resetPlayerPosition();
+                            }
+                        }
+                    });
+                },
+                checkSpecialBlocks: function(timestamp) {
+                    const currentBlock = this.specialBlocks.find(b => b.col === this.player.col && b.row === this.player.row);
+                    
+                    if (!currentBlock) { this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION; return; }
+                    
+                    if (currentBlock.type === 'SLOW') {
+                        if(this.player.moveDuration !== CONFIG.PLAYER_MOVE_DURATION * 2) this.createFloatingText('// ADVERTENCIA: CAMPO LENTO //', this.player.col, this.player.row, 'var(--color-accent-error)');
+                        this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION * 2;
+                    } else if (currentBlock.type === 'BOOST') {
+                         if(this.player.moveDuration !== CONFIG.PLAYER_MOVE_DURATION / 2) this.createFloatingText('// SISTEMA: ACELERACIÓN //', this.player.col, this.player.row, 'var(--color-accent-bios)');
+                         this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION / 2;
+                         setTimeout(() => this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION, 3000);
+                    } else {
+                        this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION;
                     }
 
-                    try {
-                        var data = localStorage.getItem(STORAGE_KEY);
-                        if (!data) {
-                            return getDefaultData();
+                    if (currentBlock.type === 'T-PORT' && (!this.teleportCooldowns[currentBlock.id] || this.teleportCooldowns[currentBlock.id] <= 0)) {
+                        const destinationBlock = this.specialBlocks.find(b => b.type === 'T-PORT' && b.id === currentBlock.id && (b.col !== currentBlock.col || b.row !== currentBlock.row));
+                        if (destinationBlock) {
+                            this.createFloatingText('// SALTO CUÁNTICO //', destinationBlock.col, destinationBlock.row);
+                            this.player.col = destinationBlock.col; this.player.row = destinationBlock.row;
+                            this.player.animX = this.player.col * this.currentConfig.gridSize; this.player.animY = this.player.row * this.currentConfig.gridSize;
+                            this.teleportCooldowns[currentBlock.id] = 2000;
+                            audioManager.playSound('teleport');
+                            announce('Teletransporte ejecutado');
+                        }
+                    }
+                },
+                evaluateBoardState: function(timestamp) {
+                    let newDeliveries = 0;
+                    const oldCombo = this.state.comboCounter;
+                    const previouslyDelivered = this.state.deliveredCount;
+
+                    this.targetZones.forEach(zone => {
+                        const wasSatisfied = zone.satisfied;
+                        zone.satisfied = this.letters.some(l => l.char === zone.char && l.col === zone.col && l.row === zone.row && l.corruptedTimer <= 0);
+                        if (zone.satisfied && !wasSatisfied) { newDeliveries++; this.createEnergyPulse(zone.col, zone.row, 1, false); }
+                    });
+
+                    if (newDeliveries > 0) {
+                        if (timestamp - this.state.lastDeliveryTime < CONFIG.COMBO_TIME_WINDOW) { this.state.comboCounter += (newDeliveries * CONFIG.COMBO_MULTIPLIER_INCREMENT); }
+                        else { this.state.comboCounter = 1 + (newDeliveries > 1 ? (newDeliveries -1) * CONFIG.COMBO_MULTIPLIER_INCREMENT : 0); }
+                        
+                        if (this.state.comboCounter > 1 && oldCombo === 1) {
+                             this.createFloatingText(`// COMBO x${this.state.comboCounter.toFixed(1)} ACTIVADO //`, this.player.col, this.player.row, 'var(--color-accent-bios)');
                         }
 
-                        var parsedData = JSON.parse(data);
-                        if (!validateData(parsedData)) {
-                            console.warn('Datos corruptos, usando valores por defecto');
-                            return getDefaultData();
+                        const comboBonus = Math.max(1, this.state.comboCounter);
+                        this.state.score += newDeliveries * CONFIG.LETTER_DELIVER_SCORE * comboBonus;
+                        this.state.lastDeliveryTime = timestamp;
+                        audioManager.playSound('collect');
+                        announce(`${newDeliveries} letra(s) entregada(s). Combo por ${comboBonus.toFixed(1)}`);
+                    } else if (this.targetZones.some(z => !z.satisfied) && this.state.deliveredCount > this.targetZones.filter(z => z.satisfied).length) {
+                        announce('Letra removida del objetivo');
+                        this.state.comboCounter = 1;
+                    }
+
+                    this.state.deliveredCount = this.targetZones.filter(z => z.satisfied).length;
+                    
+                    if (dom.sideHud.combo) { dom.sideHud.combo.textContent = this.state.comboCounter > 1 ? `COMBO x${this.state.comboCounter.toFixed(1)}` : ''; }
+                    
+                    const checkpointThreshold = Math.floor(this.currentConfig.command.length / 2);
+                    if(state.currentLevel >= 7 && !this.checkpoint && this.state.deliveredCount >= checkpointThreshold && previouslyDelivered < checkpointThreshold) {
+                        this.checkpoint = { playerPos: { col: this.player.col, row: this.player.row } };
+                        this.createFloatingText('// CHECKPOINT ALCANZADO //', this.player.col, this.player.row, 'var(--color-accent-bios)');
+                    }
+
+
+                    if (this.state.deliveredCount === this.currentConfig.command.length) {
+                        this.createEnergyPulse(Math.floor(this.board.cols / 2), Math.floor(this.board.rows / 2), 3, true);
+                        const timeBonus = Math.floor(this.state.levelTimeRemaining / 1000) * CONFIG.TIME_BONUS_PER_SECOND;
+                        const moveBonus = Math.max(0, CONFIG.MOVE_BONUS_BASE - (this.state.moveCount * CONFIG.MOVE_PENALTY_PER_MOVE));
+                        this.state.score += timeBonus + moveBonus;
+                        this.state.score += CONFIG.COMMAND_COMPLETE_BONUS;
+                        storage.markLevelAsDone(state.currentMode, state.currentLevel, state.operatorName);
+                        storage.setHighscore(state.currentMode, state.currentLevel, state.operatorName, this.state.score);
+                        state.playerData.totalPoints += this.state.score;
+                        this.finalizeInventory();
+                        statsManager.logEvent('LEVEL_COMPLETE', { mode: state.currentMode });
+                        audioManager.playSound('complete');
+                        setTimeout(() => navigateTo('victory'), 500); // Wait for disintegration
+                    }
+                },
+                saveState: function() { const currentState = { playerPos: { col: this.player.col, row: this.player.row }, letterPos: this.letters.map(l => ({ col: l.col, row: l.row })) }; this.stateStack.push(currentState); if (this.stateStack.length > 50) this.stateStack.shift(); },
+                undoMove: function() { if (this.player.isMoving || this.letters.some(l => l.isMoving)) return; if (this.stateStack.length === 0) return; const lastState = this.stateStack.pop(); const gridSize = this.currentConfig.gridSize; this.player.col = lastState.playerPos.col; this.player.row = lastState.playerPos.row; this.player.animX = this.player.col * gridSize; this.player.animY = this.player.row * gridSize; this.letters.forEach((l, i) => { l.col = lastState.letterPos[i].col; l.row = lastState.letterPos[i].row; l.animX = l.col * gridSize; l.animY = l.row * gridSize; }); this.state.moveCount = Math.max(0, this.state.moveCount - 1); this.evaluateBoardState(this.lastUpdateTime); audioManager.playSound('click'); },
+                useItem: function(keyHint) {
+                    const itemId = Object.keys(SHOP_ITEMS).find(id => SHOP_ITEMS[id].keyHint === keyHint);
+                    if (!itemId || !this.levelInventory[itemId] || this.levelInventory[itemId] <= 0) { return; }
+                    this.levelInventory[itemId]--;
+                    audioManager.playSound('powerup');
+                    this.updateItemHud();
+                    switch (itemId) {
+                        case 'shield': this.player.isInvincible = true; this.player.invincibilityTimer = 300; announce('ESCUDO ACTIVADO'); break;
+                        case 'speed': this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION / 2; setTimeout(() => { if (this.player.moveDuration === CONFIG.PLAYER_MOVE_DURATION / 2) { this.player.moveDuration = CONFIG.PLAYER_MOVE_DURATION; } }, 5000); announce('SOBRECARGA TEMPORAL ACTIVADA'); break;
+                        case 'bypass': const nextChar = this.currentConfig.command.split('').find(char => !this.targetZones.find(z => z.char === char && z.satisfied)); if (nextChar) { const letterToBypass = this.letters.find(l => l.char === nextChar); const targetZone = this.targetZones.find(z => z.char === nextChar && !z.satisfied); if (letterToBypass && targetZone) { this.saveState(); letterToBypass.isMoving = true; letterToBypass.animProgress = 0; letterToBypass.targetCol = targetZone.col; letterToBypass.targetRow = targetZone.row; announce(`CHIP DE OMISION USADO EN LETRA ${nextChar}`); } } break;
+                    }
+                },
+                finalizeInventory: function() { state.playerData.inventory = { ...this.levelInventory }; storage.savePlayerData(state.operatorName, state.playerData); },
+                createEnergyPulse: function(col, row, scale = 1, isVictory = false) { const gridSize = this.currentConfig.gridSize; this.energyPulses.push({ x: col * gridSize + gridSize / 2, y: row * gridSize + gridSize / 2, life: 1, maxLife: 1, radius: 0, maxRadius: gridSize * scale, color: isVictory ? getComputedStyle(document.body).getPropertyValue('--color-accent-bios') : getComputedStyle(document.body).getPropertyValue('--color-accent-primary') }); },
+                updateEnergyPulses: function(timeDelta) { this.energyPulses = this.energyPulses.filter(p => { p.life -= timeDelta / 500; p.radius = p.maxRadius * (1 - p.life); return p.life > 0; }); },
+                createFloatingText: function(text, col, row, color = 'var(--color-accent-primary)') {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.floatingTexts.push({
+                        text: text,
+                        x: col * gridSize + gridSize / 2,
+                        y: row * gridSize - 10,
+                        life: 1500,
+                        maxLife: 1500,
+                        color: color
+                    });
+                },
+                updateFloatingTexts: function(timeDelta) {
+                    this.floatingTexts.forEach(ft => {
+                        ft.life -= timeDelta;
+                        ft.y -= 0.5; // Float up
+                    });
+                    this.floatingTexts = this.floatingTexts.filter(ft => ft.life > 0);
+                },
+
+                draw: function(timestamp) {
+                    if (!this.currentConfig || !this.currentConfig.gridSize || this.player.animX === undefined) return; 
+                    this.ctx.save(); 
+                    const gridSize = this.currentConfig.gridSize; 
+                    this.ctx.clearRect(0, 0, dom.gameCanvas.width, dom.gameCanvas.height); 
+                    this.drawGrid(); 
+                    this.drawTargetZones(); 
+                    this.drawSpecialBlocks();
+                    this.drawEnergyPulses();
+                    this.trail.forEach(p => { 
+                        this.ctx.globalAlpha = p.life * 0.5; 
+                        this.ctx.fillStyle = p.color; 
+                        this.ctx.fillRect(p.x, p.y, p.size, p.size);
+                    }); 
+                    this.ctx.globalAlpha = 1; 
+                    this.letters.forEach(l => { 
+                        if (l.isSpawning) { this.drawSpawningEntity(l, 'letter'); }
+                        else if (l.corruptedTimer > 0) { this.drawCorruptedLetter(l, timestamp); }
+                        else {
+                            const color = this.targetZones.some(z => z.satisfied && z.col === l.col && z.row === l.row) ? getComputedStyle(document.body).getPropertyValue('--color-accent-bios') : 'yellow'; 
+                            const key = `${l.char}_${color}`; 
+                            const letterImg = this.letterCache[key]; 
+                            if (letterImg && letterImg.complete) { this.ctx.drawImage(letterImg, l.animX, l.animY, gridSize, gridSize); } 
                         }
-
-                        return parsedData;
-                    } catch(e) {
-                        console.error('Error cargando datos:', e);
-                        return getDefaultData();
-                    }
-                },
-
-                clear: function() {
-                    if (!isLocalStorageAvailable()) return false;
+                    }); 
+                    this.drawEnemies(); 
+                    this.drawFloatingTexts();
+                    if (!(this.player.isInvincible && Math.floor(timestamp / 100) % 2 !== 0)) { 
+                        this.drawPlayer(timestamp);
+                    } 
+                    this.ctx.restore(); 
                     
-                    try {
-                        localStorage.removeItem(STORAGE_KEY);
-                        return true;
-                    } catch(e) {
-                        console.error('Error limpiando datos:', e);
-                        return false;
+                    let targetHTML = 'TARGET: ';
+                    for (let i = 0; i < this.currentConfig.command.length; i++) {
+                        const char = this.currentConfig.command[i];
+                        const isDelivered = this.targetZones[i] && this.targetZones[i].satisfied;
+                        targetHTML += `<span class="${isDelivered ? 'delivered' : ''}">${char}</span>`;
                     }
-                }
-            };
-        })();
-
-        // Módulo de UI
-        var UIManager = (function() {
-            var currentScreen = 'screen-bios';
-
-            function switchScreen(screenId) {
-                var screens = document.querySelectorAll('.screen');
-                for (var i = 0; i < screens.length; i++) {
-                    screens[i].classList.remove('active');
-                }
-
-                var newScreen = document.getElementById(screenId);
-                if (newScreen) {
-                    newScreen.classList.add('active');
-                    currentScreen = screenId;
-                }
-            }
-
-            function updateDisplay(elementId, content) {
-                var element = document.getElementById(elementId);
-                if (element) {
-                    element.textContent = content;
-                }
-            }
-
-            function updateHTML(elementId, html) {
-                var element = document.getElementById(elementId);
-                if (element) {
-                    element.innerHTML = html;
-                }
-            }
-
-            return {
-                switchScreen: switchScreen,
-                updateDisplay: updateDisplay,
-                updateHTML: updateHTML,
-                getCurrentScreen: function() {
-                    return currentScreen;
-                },
-                showAlert: function(title, message) {
-                    document.getElementById('anomaly-alert-title').textContent = title;
-                    document.getElementById('anomaly-alert-message').textContent = message;
-                    document.getElementById('anomaly-alert').classList.add('active');
                     
-                    setTimeout(function() {
-                        document.getElementById('anomaly-alert').classList.remove('active');
-                    }, 3000);
-                }
-            };
-        })();
+                    dom.gameHud.target.innerHTML = targetHTML;
+                    dom.gameHud.playerLevel.textContent = `OPERADOR: ${state.operatorName} | NIVEL: ${formatNumber(state.currentLevel, 2)}`;
+                    
+                    if (dom.sideHud.score) {
+                        dom.sideHud.score.textContent = `SCORE: ${formatNumber(this.state.score, 4)}`;
+                        dom.sideHud.moves.textContent = `MOVES: ${formatNumber(this.state.moveCount, 4)}`;
+                        dom.sideHud.total.textContent = `TOTAL: ${formatNumber(state.playerData.totalPoints, 4)}`;
+                    }
 
-        // Módulo de generación de problemas matemáticos
-        var ProblemGenerator = (function() {
-            function randomInt(min, max) {
-                return Math.floor(Math.random() * (max - min + 1)) + min;
-            }
-
-            function generateAddition(config) {
-                var a = randomInt(config.range[0], config.range[1]);
-                var b = randomInt(config.range[0], config.range[1]);
-                return {
-                    question: a + ' + ' + b + ' = ?',
-                    answer: a + b
-                };
-            }
-
-            function generateSubtraction(config) {
-                var a = randomInt(config.range[0], config.range[1]);
-                var b = randomInt(config.range[0], Math.min(a, config.range[1]));
-                return {
-                    question: a + ' - ' + b + ' = ?',
-                    answer: a - b
-                };
-            }
-
-            function generateMultiplication(config) {
-                var multiplier = config.multiplier || randomInt(2, 10);
-                var multiplicand = randomInt(config.range[0], config.range[1]);
-                return {
-                    question: multiplier + ' × ' + multiplicand + ' = ?',
-                    answer: multiplier * multiplicand
-                };
-            }
-
-            function generateDivision(config) {
-                var divisors = config.divisors || [2, 3, 4, 5];
-                var divisor = divisors[randomInt(0, divisors.length - 1)];
-                var quotient = randomInt(config.range[0] / divisor, config.range[1] / divisor);
-                var dividend = divisor * quotient;
-                return {
-                    question: dividend + ' ÷ ' + divisor + ' = ?',
-                    answer: quotient
-                };
-            }
-
-            function generateMixed(config) {
-                var types = ['addition', 'subtraction', 'multiplication', 'division'];
-                var type = types[randomInt(0, types.length - 1)];
+                    this.drawMinimap();
+                    this.updateItemHud();
+                },
                 
-                var generators = {
-                    addition: generateAddition,
-                    subtraction: generateSubtraction,
-                    multiplication: generateMultiplication,
-                    division: generateDivision
-                };
+                mainLoop: function(timestamp) {
+                    matrixEffect.draw();
+                    if (dom.fullscreenEnforcer.classList.contains('active')) { 
+                        this.lastUpdateTime = 0; 
+                    } else if (state.currentView === 'game') { 
+                        this.update(timestamp); 
+                        this.draw(timestamp); 
+                    } 
+                    requestAnimationFrame(this.mainLoop.bind(this)); 
+                },
+                drawGrid: function() { this.ctx.save(); this.ctx.strokeStyle = getComputedStyle(document.body).getPropertyValue('--color-funckey-primary'); this.ctx.globalAlpha = 0.5; this.ctx.lineWidth = 1; for (let i = 1; i < this.board.cols; i++) { const x = i * this.currentConfig.gridSize; this.ctx.beginPath(); this.ctx.moveTo(x, 0); this.ctx.lineTo(x, dom.gameCanvas.height); this.ctx.stroke(); } for (let i = 1; i < this.board.rows; i++) { const y = i * this.currentConfig.gridSize; this.ctx.beginPath(); this.ctx.moveTo(0, y); this.ctx.lineTo(dom.gameCanvas.width, y); this.ctx.stroke(); } this.ctx.restore(); },
+                drawEnemies: function() { const gridSize = this.currentConfig.gridSize; this.enemies.forEach(e => { 
+                    if (e.isSpawning) { this.drawSpawningEntity(e, e.type); return; }
+                    if (e.type === 'PATRULLA') { this.ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--color-accent-error'); } 
+                    else if (e.type === 'RASTREADOR') { this.ctx.fillStyle = '#FF8C00'; }
+                    else if (e.type === 'CORRUPTOR') { this.ctx.fillStyle = '#A43BFF'; }
+                    this.ctx.fillRect(e.animX, e.animY, gridSize, gridSize); 
+                }); },
+                drawTargetZones: function() { const gridSize = this.currentConfig.gridSize; this.targetZones.forEach(zone => { if (state.currentLevel <= 3 && !zone.satisfied) { const hintImg = this.letterCache[`${zone.char}_yellow`]; if (hintImg) { this.ctx.globalAlpha = 0.15; this.ctx.drawImage(hintImg, zone.col * gridSize, zone.row * gridSize, gridSize, gridSize); } } this.ctx.globalAlpha = zone.satisfied ? 0.7 : 0.3; const color = zone.satisfied ? getComputedStyle(document.body).getPropertyValue('--color-accent-bios') : getComputedStyle(document.body).getPropertyValue('--color-accent-primary'); this.ctx.strokeStyle = color; this.ctx.lineWidth = 2; this.ctx.setLineDash([4, 4]); this.ctx.strokeRect(zone.col * gridSize + 2, zone.row * gridSize + 2, gridSize - 4, gridSize - 4); this.ctx.setLineDash([]); this.ctx.globalAlpha = 1.0; }); },
+                drawSpecialBlocks: function() {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.specialBlocks.forEach(b => {
+                        const x = b.col * gridSize; const y = b.row * gridSize;
+                        this.ctx.save();
+                        if (b.type === 'SOLID') { this.ctx.fillStyle = '#404040'; this.ctx.fillRect(x, y, gridSize, gridSize); this.ctx.strokeStyle = '#606060'; this.ctx.strokeRect(x,y,gridSize,gridSize); }
+                        else if (b.type === 'SLOW') { this.ctx.fillStyle = 'rgba(0, 100, 255, 0.4)'; this.ctx.fillRect(x, y, gridSize, gridSize); }
+                        else if (b.type === 'BOOST') { this.ctx.fillStyle = 'rgba(0, 255, 132, 0.2)'; this.ctx.fillRect(x, y, gridSize, gridSize); this.ctx.strokeStyle = 'rgba(0, 255, 132, 0.8)'; this.ctx.font = `${gridSize*0.6}px ${getComputedStyle(document.body).getPropertyValue('--font-family')}`; this.ctx.textAlign = 'center'; this.ctx.textBaseline = 'middle'; this.ctx.fillText('>>>', x + gridSize/2, y + gridSize/2); }
+                        else if (b.type === 'UNSTABLE') { this.ctx.fillStyle = b.isActive ? '#555' : 'rgba(85,85,85,0.2)'; this.ctx.fillRect(x,y,gridSize,gridSize); if(b.isActive) { this.ctx.strokeStyle = '#777'; this.ctx.strokeRect(x,y,gridSize,gridSize);} }
+                        else if (b.type === 'T-PORT') {
+                            this.ctx.fillStyle = b.color || '#A43BFF';
+                            this.ctx.fillRect(x + gridSize * 0.1, y + gridSize * 0.1, gridSize * 0.8, gridSize * 0.8);
+                            const cooldown = this.teleportCooldowns[b.id] || 0;
+                            if (cooldown > 0) {
+                                this.ctx.fillStyle = 'rgba(0,0,0,0.7)';
+                                this.ctx.beginPath();
+                                this.ctx.moveTo(x + gridSize / 2, y + gridSize / 2);
+                                this.ctx.arc(x + gridSize / 2, y + gridSize / 2, gridSize * 0.4, -Math.PI / 2, -Math.PI / 2 + (2 * Math.PI * (cooldown / 2000)), false);
+                                this.ctx.closePath();
+                                this.ctx.fill();
+                            }
+                        }
+                        this.ctx.restore();
+                    });
+                },
+                drawEnergyPulses: function() {
+                    this.energyPulses.forEach(p => {
+                        this.ctx.save();
+                        this.ctx.beginPath();
+                        this.ctx.arc(p.x, p.y, p.radius, 0, 2 * Math.PI);
+                        this.ctx.strokeStyle = p.color;
+                        this.ctx.lineWidth = 4 * p.life;
+                        this.ctx.globalAlpha = p.life;
+                        this.ctx.stroke();
+                        this.ctx.restore();
+                    });
+                },
+                drawSpawningEntity: function(entity, type) {
+                    const gridSize = this.currentConfig.gridSize;
+                    const p = entity.spawnProgress;
+                    this.ctx.save();
+                    this.ctx.globalAlpha = p;
+                    const color = type === 'CORRUPTOR' ? '#A43BFF' : (type === 'letter' ? 'yellow' : getComputedStyle(document.body).getPropertyValue('--color-accent-error'));
+                    this.ctx.fillStyle = color;
+                    
+                    for (let i = 0; i < 10; i++) {
+                        const y = entity.animY + (gridSize * (1 - p)) / 2 + (i * (gridSize * p) / 10);
+                        this.ctx.globalAlpha = p * (1 - (i / 10));
+                        this.ctx.fillRect(entity.animX, y, gridSize, 1);
+                    }
+                    this.ctx.restore();
+                },
+                drawCorruptedLetter: function(letter, timestamp) {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.ctx.save();
+                    this.ctx.fillStyle = '#A43BFF';
+                    this.ctx.font = `${gridSize*0.9}px ${getComputedStyle(document.body).getPropertyValue('--font-family')}`;
+                    this.ctx.textAlign = 'center';
+                    this.ctx.textBaseline = 'middle';
+                    const corruptedChars = ['#', '?', '%', '&', '!'];
+                    const char = corruptedChars[Math.floor(timestamp / 100) % corruptedChars.length];
+                    this.ctx.fillText(char, letter.animX + gridSize / 2, letter.animY + gridSize / 2);
 
-                return generators[type](config);
-            }
+                    const scanlineY = letter.animY + (gridSize * ((timestamp % 1000) / 1000));
+                    this.ctx.fillStyle = 'rgba(255,0,0,0.4)';
+                    this.ctx.fillRect(letter.animX, scanlineY, gridSize, 2);
+                    this.ctx.restore();
+                },
+                drawFloatingTexts: function() {
+                    const gridSize = this.currentConfig.gridSize;
+                    this.floatingTexts.forEach(ft => {
+                        const p = ft.life / ft.maxLife;
+                        this.ctx.save();
+                        this.ctx.globalAlpha = Math.sin(p * Math.PI); // Fade in and out
+                        this.ctx.font = `bold ${gridSize * 0.35}px ${getComputedStyle(document.body).getPropertyValue('--font-family')}`;
+                        this.ctx.fillStyle = ft.color;
+                        this.ctx.textAlign = 'center';
+                        this.ctx.fillText(ft.text, ft.x, ft.y);
+                        this.ctx.restore();
+                    });
+                },
+                drawMinimap: function() {
+                    if (!this.minimapCtx) return;
+                    const ctx = this.minimapCtx;
+                    const canvas = ctx.canvas;
+                    const scaleX = canvas.width / (this.board.cols * this.currentConfig.gridSize);
+                    const scaleY = canvas.height / (this.board.rows * this.currentConfig.gridSize);
 
-            return {
-                generate: function(config) {
-                    var generators = {
-                        addition: generateAddition,
-                        subtraction: generateSubtraction,
-                        multiplication: generateMultiplication,
-                        division: generateDivision,
-                        mixed: generateMixed
-                    };
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    
+                    ctx.fillStyle = "rgba(0, 255, 255, 0.8)";
+                    ctx.fillRect(this.player.animX * scaleX, this.player.animY * scaleY, 4, 4);
 
-                    var generator = generators[config.type] || generateAddition;
-                    return generator(config);
-                }
+                    ctx.fillStyle = "yellow";
+                    this.letters.forEach(l => {
+                        if (l.corruptedTimer > 0) return;
+                        const isDelivered = this.targetZones.some(z => z.char === l.char && z.satisfied);
+                        if (!isDelivered) {
+                            ctx.fillRect(l.animX * scaleX, l.animY * scaleY, 2, 2);
+                        }
+                    });
+
+                    ctx.strokeStyle = "rgba(0, 255, 138, 0.7)";
+                    ctx.lineWidth = 1;
+                    this.targetZones.forEach(z => {
+                        if (!z.satisfied) {
+                            ctx.strokeRect(z.col * this.currentConfig.gridSize * scaleX, z.row * this.currentConfig.gridSize * scaleY, 3, 3);
+                        }
+                    });
+                },
+                updateItemHud: function() {
+                    const container = dom.itemHudContainer;
+                    container.innerHTML = '';
+                    const itemIds = Object.keys(SHOP_ITEMS);
+                    itemIds.forEach(id => {
+                        const item = SHOP_ITEMS[id];
+                        const count = this.levelInventory[id] || 0;
+                        const el = document.createElement('div');
+                        el.className = `item-hud-icon ${count > 0 ? 'active' : ''}`;
+                        el.textContent = `${item.keyHint}: ${count}`;
+                        container.appendChild(el);
+                    });
+                },
+                drawPlayer: function(timestamp) {
+                    const gridSize = this.currentConfig.gridSize;
+                    const x = this.player.animX;
+                    const y = this.player.animY;
+                    const size = gridSize * 0.9;
+                    const margin = (gridSize - size) / 2;
+
+                    this.ctx.save();
+                    this.ctx.globalAlpha = this.player.moveDuration < CONFIG.PLAYER_MOVE_DURATION * 2 ? 1.0 : 0.4;
+                    
+                    let color = '#FF00FF'; // Magenta
+
+                    if (state.playerData.isLegendary) {
+                        const hue = (timestamp / 20) % 360;
+                        color = `hsl(${hue}, 100%, 70%)`;
+                    }
+                    else if (this.player.moveDuration < CONFIG.PLAYER_MOVE_DURATION) {
+                        color = '#FFFFFF';
+                    } else if (this.player.moveDuration > CONFIG.PLAYER_MOVE_DURATION) {
+                        color = '#007BFF';
+                    }
+
+                    this.ctx.fillStyle = color;
+                    this.ctx.shadowColor = color;
+                    this.ctx.shadowBlur = 10;
+                    this.ctx.fillRect(x + margin, y + margin, size, size);
+
+                    this.ctx.restore();
+                },
             };
-        })();
 
-        // Sistema de Audio Simple
-        var AudioManager = (function() {
-            var audioContext = null;
-
-            try {
-                var AudioContext = window.AudioContext || window.webkitAudioContext;
-                audioContext = new AudioContext();
-            } catch(e) {
-                console.warn('Web Audio API no soportada');
-            }
-
-            function playTone(frequency, duration) {
-                if (!audioContext || !GameState.get('soundEnabled')) return;
-
-                var oscillator = audioContext.createOscillator();
-                var gainNode = audioContext.createGain();
-
-                oscillator.connect(gainNode);
-                gainNode.connect(audioContext.destination);
-
-                oscillator.frequency.value = frequency;
-                oscillator.type = 'sine';
-
-                gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-                gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
-
-                oscillator.start(audioContext.currentTime);
-                oscillator.stop(audioContext.currentTime + duration);
-            }
-
-            return {
-                playClick: function() {
-                    playTone(800, 0.1);
-                },
-                playSuccess: function() {
-                    playTone(600, 0.15);
-                    setTimeout(function() { playTone(800, 0.15); }, 100);
-                },
-                playError: function() {
-                    playTone(200, 0.3);
-                },
-                playLevelComplete: function() {
-                    playTone(523, 0.2);
-                    setTimeout(function() { playTone(659, 0.2); }, 150);
-                    setTimeout(function() { playTone(784, 0.3); }, 300);
-                }
-            };
-        })();
-
-        // Inicialización y Control del Juego
-        var GameController = (function() {
-            var savedData = StorageManager.load();
-            var problemCount = 0;
-            var maxProblems = 5;
-            var correctAnswers = 0;
+            function runPreflightChecks() { return new Promise((resolve, reject) => { const requiredWindows = ['preload', 'title', 'profiles', 'player', 'mainMenu', 'terminal', 'stats', 'game', 'victory']; for (const id of requiredWindows) { if (!document.getElementById(id)) { reject(new Error(`[PREFLIGHT][ERR] Missing critical window: #${id}`)); return; } } resolve('[PREFLIGHT][OK] All systems nominal.'); }); }
+            
+            let konamiSequence = [];
+            const konamiCode = ['ArrowUp', 'ArrowUp', 'ArrowDown', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ArrowLeft', 'ArrowRight'];
 
             function init() {
-                // Cargar datos guardados
-                if (savedData.playerName) {
-                    GameState.set('playerName', savedData.playerName);
+                if ('ontouchstart' in window || navigator.maxTouchPoints > 0) { document.body.classList.add('touch-device'); }
+                applyPalette(storage.loadPalette() || 'CODIGO_CIAN');
+                state.soundOn = storage.loadSoundPref();
+                dom.soundBtn.textContent = `SONIDO: ${state.soundOn ? 'ON' : 'OFF'}`;
+                state.dpadVisible = storage.loadDpadPref();
+                dom.dpadContainer.classList.toggle('visible', state.dpadVisible);
+                dom.dpadSettingsBtn.textContent = `D-PAD: ${state.dpadVisible ? 'ON' : 'OFF'}`;
+
+                const savedDpadPos = storage.loadDpadPosition();
+                if (savedDpadPos && savedDpadPos.left && savedDpadPos.top) {
+                    dom.dpadContainer.style.left = savedDpadPos.left;
+                    dom.dpadContainer.style.top = savedDpadPos.top;
+                    dom.dpadContainer.style.bottom = 'auto';
+                    dom.dpadContainer.style.transform = 'none';
                 }
-                GameState.set('soundEnabled', savedData.soundEnabled);
 
-                // BIOS animation
-                setTimeout(function() {
-                    var biosText = document.getElementById('bios-text');
-                    var loadingText = 'Cargando sistema matemático';
-                    var dots = '';
-                    var count = 0;
+                document.getElementById('resume-fullscreen-btn').addEventListener('click', requestFullscreen);
+                document.getElementById('sdpad-reset').addEventListener('click', () => game.reset());
 
-                    var loadingInterval = setInterval(function() {
-                        dots = dots.length >= 3 ? '' : dots + '.';
-                        biosText.textContent = loadingText + dots;
-                        count++;
-
-                        if (count >= 8) {
-                            clearInterval(loadingInterval);
-                            biosText.textContent = '¡Sistema listo!';
-                            setTimeout(function() {
-                                UIManager.switchScreen('screen-title');
-                            }, 500);
+                document.body.addEventListener('click', (e) => {
+                    const target = e.target;
+                    const isSettingsButton = target.closest('#settings-panel button');
+                    if (target.id !== 'settings-button' && !isSettingsButton) { dom.settingsPanel.style.display = 'none'; }
+                    audioManager.init();
+                    if(target.id !== 'resume-fullscreen-btn' && !isSettingsButton && target.id !== 'sdpad-reset') { audioManager.playSound('click'); }
+                    const buyBtn = target.closest('.buy-btn'); if (buyBtn) { const itemId = buyBtn.dataset.itemId; const item = SHOP_ITEMS[itemId]; if (state.playerData.totalPoints >= item.cost) { state.playerData.totalPoints -= item.cost; state.playerData.inventory[itemId] = (state.playerData.inventory[itemId] || 0) + 1; storage.savePlayerData(state.operatorName, state.playerData); statsManager.checkAchievements(); populateTerminal(); } return; }
+                    if (state.currentView === 'preload' || target.id === 'start-btn' || target.closest('#title')) { 
+                        requestFullscreen(); 
+                        if (storage.loadProfiles().length === 0) {
+                            storage.saveProfile('OPERADOR_01');
                         }
-                    }, 300);
-                }, 1000);
-
-                setupEventListeners();
-            }
-
-            function setupEventListeners() {
-                // Title screen
-                document.getElementById('btn-start').addEventListener('click', function() {
-                    AudioManager.playClick();
-                    if (GameState.get('playerName')) {
-                        showLevelSelect();
-                    } else {
-                        UIManager.switchScreen('screen-name');
+                        navigateTo('profiles'); 
+                        return; 
                     }
-                });
-
-                // Sound toggle
-                var soundButtons = [
-                    document.getElementById('btn-sound-toggle'),
-                    document.getElementById('btn-main-sound-toggle')
-                ];
-
-                soundButtons.forEach(function(btn) {
-                    if (btn) {
-                        btn.addEventListener('click', function() {
-                            var enabled = !GameState.get('soundEnabled');
-                            GameState.set('soundEnabled', enabled);
-                            StorageManager.save({ soundEnabled: enabled });
-                            
-                            if (enabled) {
-                                AudioManager.playClick();
-                            }
-
-                            btn.style.opacity = enabled ? '1' : '0.5';
-                        });
+                    const keyTarget = target.closest('.key'); if (state.currentView === 'player' && keyTarget) { handleKeyPress(keyTarget.dataset.key); return; }
+                    const levelTarget = target.closest('.level-button'); if (levelTarget && levelTarget.dataset.level) { game.start(parseInt(levelTarget.dataset.level, 10)); return; }
+                    
+                    const profileTarget = target.closest('.profile-card');
+                    if (profileTarget && !target.classList.contains('delete-profile-btn')) { 
+                        state.operatorName = profileTarget.dataset.name; 
+                        state.playerData = storage.loadPlayerData(state.operatorName);
+                        state.currentMode = 'OPEN_FIELD';
+                        navigateTo('mainMenu'); 
+                        return; 
                     }
+                    
+                    if (target.id === 'new-player-btn') { navigateTo('player'); return; }
+                    if (target.id === 'victory-continue-btn') { navigateTo('mainMenu'); return; }
+                    if (target.id === 'terminal-btn') { navigateTo('terminal'); return; }
+                    if (target.id === 'back-to-menu-btn') { navigateTo('mainMenu'); return; }
+                    if (target.id === 'stats-btn' || target.id === 'stats-back-btn') { navigateTo(target.id === 'stats-btn' ? 'stats' : 'mainMenu'); return; }
+                    if (target.id === 'settings-button') { dom.settingsPanel.style.display = (dom.settingsPanel.style.display === 'block') ? 'none' : 'block'; return; }
+                    if (isSettingsButton) { audioManager.playSound('click'); if (target.id === 'sound-btn') { state.soundOn = !state.soundOn; storage.saveSoundPref(state.soundOn); target.textContent = `SONIDO: ${state.soundOn ? 'ON' : 'OFF'}`; } if (target.id === 'palette-btn') { state.currentPaletteIndex = (state.currentPaletteIndex + 1) % PALETTE_ORDER.length; const newPaletteName = PALETTE_ORDER[state.currentPaletteIndex]; applyPalette(newPaletteName); storage.savePalette(newPaletteName); } if (target.id === 'dpad-settings-btn') { state.dpadVisible = !state.dpadVisible; storage.saveDpadPref(state.dpadVisible); dom.dpadContainer.classList.toggle('visible', state.dpadVisible); target.textContent = `D-PAD: ${state.dpadVisible ? 'ON' : 'OFF'}`; } if (target.id === 'change-player-btn') { navigateTo('profiles'); } if (target.id === 'exit-btn') { window.close(); } dom.settingsPanel.style.display = 'none'; return; }
                 });
-
-                // Name entry keyboard
-                setupNameKeyboard();
-
-                // Profile button
-                document.getElementById('btn-profile').addEventListener('click', function() {
-                    AudioManager.playClick();
-                    showProfile();
-                });
-
-                // Change name button
-                document.getElementById('btn-change-name').addEventListener('click', function() {
-                    AudioManager.playClick();
-                    GameState.set('playerName', '');
-                    GameState.set('currentAnswer', '');
-                    document.getElementById('name-display').textContent = '_';
-                    UIManager.switchScreen('screen-name');
-                });
-
-                // Back to levels
-                document.getElementById('btn-back-to-levels').addEventListener('click', function() {
-                    AudioManager.playClick();
-                    showLevelSelect();
-                });
-
-                // Reset progress
-                document.getElementById('btn-reset-progress').addEventListener('click', function() {
-                    if (confirm('¿Estás seguro de que quieres reiniciar todo tu progreso?')) {
-                        StorageManager.clear();
-                        location.reload();
+                window.addEventListener('keydown', (e) => {
+                    
+                    if (state.currentView === 'mainMenu') {
+                        if (konamiCode.includes(e.key)) {
+                            konamiSequence.push(e.key);
+                            while (konamiSequence.length > konamiCode.length) konamiSequence.shift();
+                            if (konamiSequence.join(',') === konamiCode.join(',')) {
+                                PALETTES['VAPORWAVE'] = { bg: '#0D0221', text: '#A9A3B6', accent: '#FF00C1', error: '#00F6FF' };
+                                if (!PALETTE_ORDER.includes('VAPORWAVE')) PALETTE_ORDER.push('VAPORWAVE');
+                                state.playerData.totalPoints += 50000;
+                                storage.savePlayerData(state.operatorName, state.playerData);
+                                applyPalette('VAPORWAVE');
+                                storage.savePalette('VAPORWAVE');
+                                dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints;
+                                konamiSequence = [];
+                            }
+                        } else {
+                            konamiSequence = [];
+                        }
                     }
+
+                    const key = e.key.toLowerCase();
+                    if (state.currentView === 'game' && (key === 'r')) { game.reset(); }
+                    else if (state.currentView === 'game' && ['1', '2', '3'].includes(key)) { e.preventDefault(); game.useItem(key); }
+                    else if (state.currentView === 'player') { if (e.key === 'Enter') handleKeyPress('ENTER'); else if (e.key === 'Backspace') handleKeyPress('<-'); else if (e.key.toUpperCase() === 'Ñ') handleKeyPress('Ñ'); else if (/^[a-zA-Z]$/.test(e.key)) handleKeyPress(e.key.toUpperCase()); } 
+                    else if (state.currentView === 'title' && e.key === 'Enter') { navigateTo('profiles'); }
+                    
+                    if(key in game.keys) { e.preventDefault(); game.keys[key] = true; }
+                    else if (e.key in game.keys) { e.preventDefault(); game.keys[e.key] = true; }
+                });
+                window.addEventListener('keyup', (e) => {
+                    const key = e.key.toLowerCase();
+                    if(key in game.keys) { e.preventDefault(); game.keys[key] = false; }
+                    else if (e.key in game.keys) { e.preventDefault(); game.keys[e.key] = false; }
+                });
+                dom.dpadBtns.forEach(btn => { const key = btn.dataset.key; const press = (e) => { e.preventDefault(); game.keys[key] = true; }; const release = (e) => { e.preventDefault(); game.keys[key] = false; }; btn.addEventListener('touchstart', press, { passive: false }); btn.addEventListener('touchend', release); btn.addEventListener('mousedown', press); btn.addEventListener('mouseup', release); btn.addEventListener('mouseleave', release); });
+                
+                const staticDpadBtns = document.querySelectorAll('#static-dpad-container .dpad-btn');
+                staticDpadBtns.forEach(btn => {
+                    const key = btn.dataset.key;
+                    if (!key) return; 
+                    const press = (e) => { e.preventDefault(); game.keys[key] = true; };
+                    const release = (e) => { e.preventDefault(); game.keys[key] = false; };
+                    btn.addEventListener('mousedown', press);
+                    btn.addEventListener('mouseup', release);
+                    btn.addEventListener('mouseleave', release);
+                    btn.addEventListener('touchstart', press, {passive: false});
+                    btn.addEventListener('touchend', release);
                 });
 
-                // Infinite mode
-                document.getElementById('btn-infinite-mode').addEventListener('click', function() {
-                    AudioManager.playClick();
-                    startInfiniteMode();
-                });
+                document.addEventListener('fullscreenchange', () => { const isGameActive = !['preload', 'title', 'profiles', 'player'].includes(state.currentView); if (!document.fullscreenElement && isGameActive) { dom.fullscreenEnforcer.classList.add('active'); } else { dom.fullscreenEnforcer.classList.remove('active'); } });
+                const dpad = dom.dpadContainer; const dragHandle = document.getElementById('dpad-drag-handle'); let isDragging = false; let offsetX, offsetY;
+                const startDrag = (e) => { isDragging = true; e.preventDefault(); const pointerX = e.pageX || e.touches[0].pageX; const pointerY = e.pageY || e.touches[0].pageY; offsetX = pointerX - dpad.offsetLeft; offsetY = pointerY - dpad.offsetTop; window.addEventListener('mousemove', onDrag, { passive: false }); window.addEventListener('touchmove', onDrag, { passive: false }); window.addEventListener('mouseup', stopDrag); window.addEventListener('touchend', stopDrag); };
+                const onDrag = (e) => { if (!isDragging) return; e.preventDefault(); const pointerX = e.pageX || e.touches[0].pageX; const pointerY = e.pageY || e.touches[0].pageY; let newLeft = pointerX - offsetX; let newTop = pointerY - offsetY; const maxX = window.innerWidth - dpad.offsetWidth; const maxY = window.innerHeight - dpad.offsetHeight; newLeft = Math.max(0, Math.min(newLeft, maxX)); newTop = Math.max(0, Math.min(newTop, maxY)); dpad.style.left = `${newLeft}px`; dpad.style.top = `${newTop}px`; dpad.style.bottom = 'auto'; dpad.style.transform = 'none'; };
+                const stopDrag = () => { isDragging = false; window.removeEventListener('mousemove', onDrag); window.removeEventListener('touchmove', onDrag); window.removeEventListener('mouseup', stopDrag); window.removeEventListener('touchend', stopDrag); storage.saveDpadPosition({ left: dpad.style.left, top: dpad.style.top }); };
+                dragHandle.addEventListener('mousedown', startDrag); dragHandle.addEventListener('touchstart', startDrag, { passive: false });
+                createVirtualKeyboard();
+                matrixEffect.init(); 
+                game.init(); 
+                requestAnimationFrame(game.mainLoop.bind(game));
+                
+                const preflightStatus = document.getElementById('preflight-status');
+                const startupChecks = runPreflightChecks();
+                const startupTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('System timeout.')), 3000));
+                Promise.race([startupChecks, startupTimeout])
+                    .then(successMsg => {
+                        preflightStatus.textContent = 'Preflight Check................';
+                        const statusSpan = document.createElement('span');
+                        statusSpan.textContent = '[OK]';
+                        statusSpan.style.color = 'var(--color-accent-bios)';
+                        preflightStatus.appendChild(statusSpan);
+                        setTimeout(() => navigateTo('title'), 1000);
+                    })
+                    .catch(error => {
+                        preflightStatus.textContent = 'Preflight Check................';
+                        const statusSpan = document.createElement('span');
+                        statusSpan.textContent = '[FAILED]';
+                        statusSpan.style.color = 'var(--color-accent-error)';
+                        preflightStatus.appendChild(statusSpan);
+                        
+                        const errorP = document.createElement('p');
+                        errorP.textContent = error.message;
+                        errorP.style.color = 'var(--color-accent-error)';
+                        preflightStatus.parentElement.appendChild(errorP);
 
-                // Game numpad
-                setupGameNumpad();
-
-                // Fullscreen prompt
-                document.getElementById('btn-continue-anyway').addEventListener('click', function() {
-                    document.getElementById('fullscreen-prompt').classList.remove('active');
-                });
-
-                document.getElementById('btn-gofullscreen').addEventListener('click', function() {
-                    var elem = document.documentElement;
-                    if (elem.requestFullscreen) {
-                        elem.requestFullscreen();
-                    } else if (elem.webkitRequestFullscreen) {
-                        elem.webkitRequestFullscreen();
-                    } else if (elem.msRequestFullscreen) {
-                        elem.msRequestFullscreen();
-                    }
-                    document.getElementById('fullscreen-prompt').classList.remove('active');
-                });
-            }
-
-            function setupNameKeyboard() {
-                var nameDisplay = document.getElementById('name-display');
-                var confirmKey = document.getElementById('name-confirm-key');
-                var isShiftActive = false;
-
-                var keys = document.querySelectorAll('#keyboard-container .key');
-                for (var i = 0; i < keys.length; i++) {
-                    keys[i].addEventListener('click', function() {
-                        var key = this.getAttribute('data-key');
-                        var currentName = GameState.get('currentAnswer');
-
-                        AudioManager.playClick();
-
-                        if (key === 'SHIFT') {
-                            isShiftActive = !isShiftActive;
-                            this.style.background = isShiftActive ? 'var(--color-primary)' : '';
-                            return;
-                        }
-
-                        if (key === 'BACKSPACE') {
-                            if (currentName.length > 0) {
-                                currentName = currentName.slice(0, -1);
-                                GameState.set('currentAnswer', currentName);
-                                nameDisplay.textContent = currentName || '_';
-                            }
-                            return;
-                        }
-
-                        if (key === '✓') {
-                            if (currentName.length >= 2) {
-                                GameState.set('playerName', currentName);
-                                StorageManager.save({ playerName: currentName });
-                                showLevelSelect();
-                            }
-                            return;
-                        }
-
-                        if (currentName.length < 15) {
-                            var char = isShiftActive ? key.toUpperCase() : key;
-                            currentName += char;
-                            GameState.set('currentAnswer', currentName);
-                            nameDisplay.textContent = currentName;
-
-                            if (currentName.length >= 2) {
-                                confirmKey.classList.remove('disabled');
-                            }
-                        }
+                        const forceButton = document.createElement('button');
+                        forceButton.textContent = 'FORZAR ARRANQUE';
+                        forceButton.className = 'big-button';
+                        forceButton.style.marginTop = '2rem';
+                        forceButton.onclick = () => navigateTo('title');
+                        preflightStatus.parentElement.parentElement.appendChild(forceButton);
                     });
-                }
             }
-
-            function setupGameNumpad() {
-                var answerDisplay = document.getElementById('answer-display');
-                var enterKey = document.getElementById('numpad-enter');
-
-                var keys = document.querySelectorAll('#numpad-grid .key');
-                for (var i = 0; i < keys.length; i++) {
-                    keys[i].addEventListener('click', function() {
-                        var key = this.getAttribute('data-key');
-                        var currentAnswer = GameState.get('currentAnswer');
-
-                        AudioManager.playClick();
-
-                        if (key === 'C') {
-                            GameState.set('currentAnswer', '');
-                            answerDisplay.textContent = '_';
-                            enterKey.classList.add('disabled');
-                            return;
-                        }
-
-                        if (key === 'ENTER') {
-                            if (currentAnswer.length > 0) {
-                                checkAnswer();
-                            }
-                            return;
-                        }
-
-                        if (currentAnswer.length < 10) {
-                            currentAnswer += key;
-                            GameState.set('currentAnswer', currentAnswer);
-                            answerDisplay.textContent = currentAnswer;
-                            enterKey.classList.remove('disabled');
-                        }
-                    });
-                }
-            }
-
-            function showLevelSelect() {
-                var playerName = GameState.get('playerName');
-                var greeting = document.getElementById('level-select-greeting');
-                greeting.textContent = '¡Hola, ' + playerName + '!';
-
-                var levelGrid = document.getElementById('level-select-grid');
-                levelGrid.innerHTML = '';
-
-                savedData = StorageManager.load();
-
-                GameState.getAllLevels().forEach(function(config, index) {
-                    var levelData = savedData.levels[index];
-                    
-                    var card = document.createElement('div');
-                    card.className = 'level-card';
-                    if (!levelData.unlocked) {
-                        card.className += ' locked';
-                    }
-
-                    var stars = '';
-                    for (var i = 0; i < 3; i++) {
-                        stars += i < levelData.stars ? '⭐' : '☆';
-                    }
-
-                    card.innerHTML = 
-                        '<div class=\"level-number\">Nivel ' + config.number + '</div>' +
-                        '<div>' + config.name + '</div>' +
-                        '<div class=\"level-stars\">' + stars + '</div>';
-
-                    if (levelData.unlocked) {
-                        card.addEventListener('click', function() {
-                            AudioManager.playClick();
-                            startLevel(config.number);
-                        });
-                    }
-
-                    levelGrid.appendChild(card);
-                });
-
-                UIManager.switchScreen('screen-level-select');
-            }
-
-            function startLevel(levelNum) {
-                GameState.reset();
-                GameState.set('currentLevel', levelNum);
-                GameState.set('infiniteMode', false);
-
-                var config = GameState.getLevelConfig(levelNum);
-                problemCount = 0;
-                maxProblems = config.problems;
-                correctAnswers = 0;
-
-                UIManager.switchScreen('screen-game');
-                updateGameHUD();
-                generateNewProblem();
-            }
-
-            function startInfiniteMode() {
-                GameState.reset();
-                GameState.set('infiniteMode', true);
-                GameState.set('lives', 1);
-                
-                problemCount = 0;
-                maxProblems = 999;
-                correctAnswers = 0;
-
-                UIManager.switchScreen('screen-game');
-                updateGameHUD();
-                generateNewProblem();
-            }
-
-            function updateGameHUD() {
-                document.getElementById('hud-player-name').textContent = GameState.get('playerName');
-                
-                var lives = GameState.get('lives');
-                var livesHTML = '';
-                for (var i = 0; i < lives; i++) {
-                    livesHTML += '❤️';
-                }
-                document.getElementById('hud-lives').innerHTML = livesHTML || '💀';
-
-                var shield = GameState.get('shield');
-                document.getElementById('hud-shield').innerHTML = shield ? '🛡️' : '';
-
-                var streak = GameState.get('streak');
-                document.getElementById('hud-streak').textContent = '🔥 ' + streak;
-
-                if (GameState.get('infiniteMode')) {
-                    document.getElementById('hud-difficulty').textContent = '♾️ Experto';
-                } else {
-                    document.getElementById('hud-difficulty').textContent = 'Nivel ' + GameState.get('currentLevel');
-                }
-            }
-
-            function generateNewProblem() {
-                var config;
-                if (GameState.get('infiniteMode')) {
-                    config = {
-                        type: 'mixed',
-                        range: [1, 100]
-                    };
-                } else {
-                    config = GameState.getLevelConfig(GameState.get('currentLevel'));
-                }
-
-                var problem = ProblemGenerator.generate(config);
-                GameState.set('currentProblem', problem);
-
-                document.getElementById('problem-container').textContent = problem.question;
-                document.getElementById('answer-display').textContent = '_';
-                GameState.set('currentAnswer', '');
-                document.getElementById('numpad-enter').classList.add('disabled');
-            }
-
-            function checkAnswer() {
-                var userAnswer = parseInt(GameState.get('currentAnswer'));
-                var correctAnswer = GameState.get('currentProblem').answer;
-
-                if (userAnswer === correctAnswer) {
-                    handleCorrectAnswer();
-                } else {
-                    handleWrongAnswer();
-                }
-            }
-
-            function handleCorrectAnswer() {
-                AudioManager.playSuccess();
-                correctAnswers++;
-                
-                var streak = GameState.get('streak') + 1;
-                GameState.set('streak', streak);
-
-                if (streak % 5 === 0 && !GameState.get('shield')) {
-                    GameState.set('shield', true);
-                    UIManager.showAlert('¡Escudo Activado!', '5 respuestas correctas seguidas');
-                }
-
-                problemCount++;
-                
-                if (problemCount >= maxProblems) {
-                    endLevel(true);
-                } else {
-                    updateGameHUD();
-                    setTimeout(generateNewProblem, 500);
-                }
-            }
-
-            function handleWrongAnswer() {
-                AudioManager.playError();
-                GameState.set('streak', 0);
-
-                if (GameState.get('shield')) {
-                    GameState.set('shield', false);
-                    UIManager.showAlert('Escudo Usado', 'Perdiste el escudo pero conservas una vida');
-                    updateGameHUD();
-                    setTimeout(generateNewProblem, 1000);
-                    return;
-                }
-
-                var lives = GameState.get('lives') - 1;
-                GameState.set('lives', lives);
-
-                if (lives <= 0) {
-                    endLevel(false);
-                } else {
-                    updateGameHUD();
-                    setTimeout(generateNewProblem, 1000);
-                }
-            }
-
-            function endLevel(success) {
-                if (GameState.get('infiniteMode')) {
-                    showResult(success, correctAnswers);
-                    return;
-                }
-
-                var levelNum = GameState.get('currentLevel');
-                var stars = 0;
-
-                if (success) {
-                    AudioManager.playLevelComplete();
-                    
-                    var accuracy = correctAnswers / maxProblems;
-                    if (accuracy >= 0.9) stars = 3;
-                    else if (accuracy >= 0.7) stars = 2;
-                    else stars = 1;
-
-                    // Update saved data
-                    savedData = StorageManager.load();
-                    savedData.levels[levelNum - 1].completed = true;
-                    savedData.levels[levelNum - 1].stars = Math.max(savedData.levels[levelNum - 1].stars, stars);
-                    
-                    if (levelNum < 10) {
-                        savedData.levels[levelNum].unlocked = true;
-                    }
-
-                    // Calculate total stars
-                    var totalStars = 0;
-                    for (var i = 0; i < savedData.levels.length; i++) {
-                        totalStars += savedData.levels[i].stars;
-                    }
-                    savedData.totalStars = totalStars;
-
-                    StorageManager.save(savedData);
-                }
-
-                showResult(success, stars);
-            }
-
-            function showResult(success, value) {
-                var icon = document.getElementById('result-icon');
-                var title = document.getElementById('result-title');
-                var explanation = document.getElementById('result-explanation');
-                var nextButton = document.getElementById('btn-next-mission');
-                var unlockMessage = document.getElementById('unlock-message');
-
-                unlockMessage.textContent = '';
-
-                if (GameState.get('infiniteMode')) {
-                    if (success) {
-                        icon.innerHTML = '<circle cx=\"50\" cy=\"50\" r=\"40\" stroke=\"var(--color-success)\" stroke-width=\"5\" fill=\"none\"/><path d=\"M30 50 L45 65 L70 35\" stroke=\"var(--color-success)\" stroke-width=\"5\" fill=\"none\"/>';
-                        title.textContent = '¡Increíble!';
-                        explanation.textContent = 'Resolviste ' + value + ' problemas en modo experto';
-                    } else {
-                        icon.innerHTML = '<circle cx=\"50\" cy=\"50\" r=\"40\" stroke=\"var(--color-danger)\" stroke-width=\"5\" fill=\"none\"/><path d=\"M30 30 L70 70 M70 30 L30 70\" stroke=\"var(--color-danger)\" stroke-width=\"5\"/>';
-                        title.textContent = 'Fin del juego';
-                        explanation.textContent = 'Resolviste ' + value + ' problemas';
-                    }
-                    nextButton.textContent = 'Volver a Niveles';
-                } else {
-                    if (success) {
-                        var stars = '';
-                        for (var i = 0; i < value; i++) {
-                            stars += '⭐';
-                        }
-                        icon.innerHTML = '<circle cx=\"50\" cy=\"50\" r=\"40\" stroke=\"var(--color-success)\" stroke-width=\"5\" fill=\"none\"/><path d=\"M30 50 L45 65 L70 35\" stroke=\"var(--color-success)\" stroke-width=\"5\" fill=\"none\"/>';
-                        title.textContent = '¡Nivel Completado!';
-                        explanation.textContent = stars + ' - ' + correctAnswers + '/' + maxProblems + ' correctas';
-
-                        var currentLevel = GameState.get('currentLevel');
-                        if (currentLevel < 10) {
-                            unlockMessage.textContent = '🔓 Desbloqueaste el Nivel ' + (currentLevel + 1);
-                        }
-                    } else {
-                        icon.innerHTML = '<circle cx=\"50\" cy=\"50\" r=\"40\" stroke=\"var(--color-danger)\" stroke-width=\"5\" fill=\"none\"/><path d=\"M30 30 L70 70 M70 30 L30 70\" stroke=\"var(--color-danger)\" stroke-width=\"5\"/>';
-                        title.textContent = 'Misión Fallida';
-                        explanation.textContent = 'Resolviste ' + correctAnswers + '/' + maxProblems + ' problemas';
-                    }
-                    nextButton.textContent = 'Continuar';
-                }
-
-                nextButton.onclick = function() {
-                    AudioManager.playClick();
-                    showLevelSelect();
-                };
-
-                UIManager.switchScreen('screen-result');
-            }
-
-            function showProfile() {
-                savedData = StorageManager.load();
-                
-                document.getElementById('profile-player-name').textContent = savedData.playerName;
-                document.getElementById('profile-total-stars').textContent = savedData.totalStars;
-
-                var masteredLevels = 0;
-                for (var i = 0; i < savedData.levels.length; i++) {
-                    if (savedData.levels[i].stars === 3) {
-                        masteredLevels++;
-                    }
-                }
-                document.getElementById('profile-mastered-levels').textContent = masteredLevels;
-
-                UIManager.switchScreen('screen-profile');
-            }
-
-            return {
-                init: init
-            };
-        })();
-
-        // Start the game when DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', GameController.init);
-        } else {
-            GameController.init();
-        }
+            init();
+        });
     </script>
 </body>
-</html>"
+</html>
