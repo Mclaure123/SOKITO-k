@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ANALYZER - v2.3.2 (Easter Egg Fix)</title>
+    <title>ANALYZER - v2.3.2 (Storage Fix)</title>
     <style>
         :root {
             --color-background-primary: #08080A; --color-element-primary: #141414; --color-funckey-primary: #2A2A2A;
@@ -513,18 +513,18 @@
             }
             
             function populateTerminal() { dom.terminalTotalPoints.textContent = state.playerData.totalPoints; const container = dom.shopItemsContainer; container.innerHTML = ''; for (const id in SHOP_ITEMS) { const item = SHOP_ITEMS[id]; const currentAmount = state.playerData.inventory[id] || 0; const itemEl = document.createElement('div'); itemEl.className = 'shop-item'; const canAfford = state.playerData.totalPoints >= item.cost; itemEl.innerHTML = `<h3>${item.name} [${currentAmount}]</h3><p class="shop-item-details">${item.desc}</p><div class="shop-item-footer"><span class="shop-item-cost">${item.cost} P</span><button class="big-button buy-btn ${canAfford ? '' : 'disabled'}" data-item-id="${id}">COMPRAR</button></div>`; container.appendChild(itemEl); } }
-            function populateStatsScreen() { const { stats, achievements } = state.playerData; const statsContainer = dom.statsDisplay; const achievementsContainer = dom.achievementsGrid; const timePlayed = stats.timePlayed || 0; const minutes = Math.floor(timePlayed / 60000); const seconds = Math.floor((timePlayed % 60000) / 1000).toString().padStart(2, '0'); statsContainer.innerHTML = `<div class="stat-card">TIEMPO DE JUEGO<div class="value">${minutes}:${seconds}</div></div><div class="stat-card">PUNTOS TOTALES<div class="value">${state.playerData.totalPoints}</div></div><div class="stat-card">NIVELES CAMPO ABIERTO<div class="value">${stats.levelsCompleted_OPEN_FIELD || 0} / 18</div></div>`; achievementsContainer.innerHTML = ''; for (const id in ACHIEVEMENT_DATA) { const ach = ACHIEVEMENT_DATA[id]; const isUnlocked = achievements[id]; const card = document.createElement('div'); card.className = `achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`; card.innerHTML = `<h3>${ach.name}</h3><p>${ach.desc}</p>`; achievementsContainer.appendChild(card); } }
+            function populateStatsScreen() { const { stats, achievements } = state.playerData; const statsContainer = dom.statsDisplay; const achievementsContainer = dom.achievementsGrid; const timePlayed = stats.timePlayed || 0; const minutes = Math.floor(timePlayed / 60000); const seconds = Math.floor((timePlayed % 60000) / 1000).toString().padStart(2, '0'); statsContainer.innerHTML = `<div class="stat-card">TIEMPO DE JUEGO<div class="value">${minutes}:${seconds}</div></div><div class="stat-card">PUNTOS TOTALES<div class="value">${state.playerData.totalPoints}</div></div><div class="stat-card">NIVELES CAMPO ABIERTO<div class="value">${stats.levelsCompleted_OPEN_FIELD || 0} / 12</div></div>`; achievementsContainer.innerHTML = ''; for (const id in ACHIEVEMENT_DATA) { const ach = ACHIEVEMENT_DATA[id]; const isUnlocked = achievements[id]; const card = document.createElement('div'); card.className = `achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`; card.innerHTML = `<h3>${ach.name}</h3><p>${ach.desc}</p>`; achievementsContainer.appendChild(card); } }
             function resizeKeyboard() { const GAP_SIZE = 8; const container = dom.keyboardWrapper; const keySizeFromWidth = (container.clientWidth - (7 * GAP_SIZE)) / 8; const keySizeFromHeight = (container.clientHeight - (3 * GAP_SIZE)) / 4; const finalKeySize = Math.floor(Math.min(keySizeFromWidth, keySizeFromHeight)); dom.virtualKeyboard.style.setProperty('--k', `${finalKeySize}px`); dom.virtualKeyboard.style.setProperty('--gap', `${GAP_SIZE}px`); }
             const keyboardLayout = [ ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', '<-'], ['A', 'S', 'D', 'F', 'G', 'H', {key: 'ENTER', span: 2}], ['I', 'J', 'K', 'L', 'M', 'Ñ', 'O', 'P'], [{key: 'SHIFT', span: 2}, 'Z', 'X', 'C', 'V', 'B', 'N'] ];
             function createVirtualKeyboard() { dom.virtualKeyboard.innerHTML = ''; keyboardLayout.flat().forEach(kI => { const kE = document.createElement('button'); kE.classList.add('key'); const k = (typeof kI === 'object') ? kI.key : kI; kE.textContent = k; kE.dataset.key = k; kE.id = `key-${k.toLowerCase()}`; if (typeof kI === 'object' && kI.span) { kE.classList.add(`span${kI.span}`); } if (['<-', 'ENTER', 'SHIFT'].includes(k)) { kE.classList.add('funckey'); } dom.virtualKeyboard.appendChild(kE); }); }
             function handleKeyPress(key) { 
                 if (key === 'ENTER') { 
-                    if (state.operatorName.length > 0) { 
+                    if (state.operatorName.length > 0) {
                         state.playerData = storage.loadPlayerData(state.operatorName); 
                         if (state.operatorName.toUpperCase() === 'HACKERMAN' || state.operatorName.toUpperCase() === 'GHOST') {
                             state.playerData.isLegendary = true;
                         }
-                        storage.saveProfile(state.operatorName); 
+                        storage.saveProfile(state.operatorName);
                         state.currentMode = 'OPEN_FIELD'; 
                         navigateTo('mainMenu'); 
                     } 
@@ -1313,13 +1313,13 @@
                     const gridSize = this.currentConfig.gridSize;
                     const x = this.player.animX;
                     const y = this.player.animY;
-                    const size = gridSize * 0.9;
-                    const margin = (gridSize - size) / 2;
-
+                    
                     this.ctx.save();
                     this.ctx.globalAlpha = this.player.moveDuration < CONFIG.PLAYER_MOVE_DURATION * 2 ? 1.0 : 0.4;
                     
                     let color = '#FF00FF'; // Magenta
+                    let particleCount = 5;
+                    let speedFactor = 1;
 
                     if (state.playerData.isLegendary) {
                         const hue = (timestamp / 20) % 360;
@@ -1327,15 +1327,27 @@
                     }
                     else if (this.player.moveDuration < CONFIG.PLAYER_MOVE_DURATION) {
                         color = '#FFFFFF';
+                        particleCount = 10;
+                        speedFactor = 2;
                     } else if (this.player.moveDuration > CONFIG.PLAYER_MOVE_DURATION) {
                         color = '#007BFF';
+                        particleCount = 3;
                     }
 
                     this.ctx.fillStyle = color;
                     this.ctx.shadowColor = color;
                     this.ctx.shadowBlur = 10;
-                    this.ctx.fillRect(x + margin, y + margin, size, size);
-
+                    
+                    const numFragments = Math.floor(this.prng() * 3) + particleCount;
+                    for (let i = 0; i < numFragments; i++) {
+                        const fragX = x + this.prng() * gridSize * 0.8 + gridSize * 0.1;
+                        const fragY = y + this.prng() * gridSize * 0.8 + gridSize * 0.1;
+                        const fragW = this.prng() * (gridSize / 4) + 2;
+                        const fragH = this.prng() * (gridSize / 4) + 2;
+                        this.ctx.globalAlpha = this.prng() * 0.5 + 0.5;
+                        this.ctx.fillRect(fragX, fragY, fragW, fragH);
+                    }
+                    
                     this.ctx.restore();
                 },
             };
