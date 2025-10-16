@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ANALYZER - v2.3.2 (Storage Fix)</title>
+    <title>ANALYZER - v2.3.2 (Easter Egg Fix)</title>
     <style>
         :root {
             --color-background-primary: #08080A; --color-element-primary: #141414; --color-funckey-primary: #2A2A2A;
@@ -517,15 +517,31 @@
             function resizeKeyboard() { const GAP_SIZE = 8; const container = dom.keyboardWrapper; const keySizeFromWidth = (container.clientWidth - (7 * GAP_SIZE)) / 8; const keySizeFromHeight = (container.clientHeight - (3 * GAP_SIZE)) / 4; const finalKeySize = Math.floor(Math.min(keySizeFromWidth, keySizeFromHeight)); dom.virtualKeyboard.style.setProperty('--k', `${finalKeySize}px`); dom.virtualKeyboard.style.setProperty('--gap', `${GAP_SIZE}px`); }
             const keyboardLayout = [ ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', '<-'], ['A', 'S', 'D', 'F', 'G', 'H', {key: 'ENTER', span: 2}], ['I', 'J', 'K', 'L', 'M', 'Ñ', 'O', 'P'], [{key: 'SHIFT', span: 2}, 'Z', 'X', 'C', 'V', 'B', 'N'] ];
             function createVirtualKeyboard() { dom.virtualKeyboard.innerHTML = ''; keyboardLayout.flat().forEach(kI => { const kE = document.createElement('button'); kE.classList.add('key'); const k = (typeof kI === 'object') ? kI.key : kI; kE.textContent = k; kE.dataset.key = k; kE.id = `key-${k.toLowerCase()}`; if (typeof kI === 'object' && kI.span) { kE.classList.add(`span${kI.span}`); } if (['<-', 'ENTER', 'SHIFT'].includes(k)) { kE.classList.add('funckey'); } dom.virtualKeyboard.appendChild(kE); }); }
-            function handleKeyPress(key) { if (key === 'ENTER') { if (state.operatorName.length > 0) { 
-                if (state.operatorName.toUpperCase() === 'HACKERMAN' || state.operatorName.toUpperCase() === 'GHOST') {
-                    state.playerData.isLegendary = true;
-                }
-                storage.saveProfile(state.operatorName); 
-                state.playerData = storage.loadPlayerData(state.operatorName); 
-                state.currentMode = 'OPEN_FIELD'; 
-                navigateTo('mainMenu'); 
-            } } else if (key === 'SHIFT') { state.isShiftActive = !state.isShiftActive; document.getElementById('key-shift').classList.toggle('active', state.isShiftActive); } else if (key === '<-') { state.operatorName = state.operatorName.slice(0, -1); } else if (state.operatorName.length < 20) { const char = state.isShiftActive ? key.toUpperCase() : key.toLowerCase(); state.operatorName += char; } if (key !== 'SHIFT' && state.isShiftActive) { state.isShiftActive = false; document.getElementById('key-shift').classList.remove('active'); } updatePlayerNameDisplay(); }
+            function handleKeyPress(key) { 
+                if (key === 'ENTER') { 
+                    if (state.operatorName.length > 0) { 
+                        state.playerData = storage.loadPlayerData(state.operatorName); 
+                        if (state.operatorName.toUpperCase() === 'HACKERMAN' || state.operatorName.toUpperCase() === 'GHOST') {
+                            state.playerData.isLegendary = true;
+                        }
+                        storage.saveProfile(state.operatorName); 
+                        state.currentMode = 'OPEN_FIELD'; 
+                        navigateTo('mainMenu'); 
+                    } 
+                } else if (key === 'SHIFT') { 
+                    state.isShiftActive = !state.isShiftActive; document.getElementById('key-shift').classList.toggle('active', state.isShiftActive); 
+                } else if (key === '<-') { 
+                    state.operatorName = state.operatorName.slice(0, -1); 
+                } else if (state.operatorName.length < 20) { 
+                    const char = state.isShiftActive ? key.toUpperCase() : key.toLowerCase(); 
+                    state.operatorName += char; 
+                } 
+                if (key !== 'SHIFT' && state.isShiftActive) { 
+                    state.isShiftActive = false; 
+                    document.getElementById('key-shift').classList.remove('active'); 
+                } 
+                updatePlayerNameDisplay(); 
+            }
             function updatePlayerNameDisplay() { dom.playerNameOutput.textContent = state.operatorName; }
             function generateProfileCards() { dom.profileGrid.innerHTML = ''; const profiles = storage.loadProfiles(); profiles.forEach(name => { const card = document.createElement('button'); card.classList.add('profile-card'); card.dataset.name = name; const nameSpan = document.createElement('span'); nameSpan.textContent = name; card.appendChild(nameSpan); const deleteBtn = document.createElement('button'); deleteBtn.classList.add('delete-profile-btn'); deleteBtn.textContent = 'X'; deleteBtn.dataset.name = name; deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); storage.deleteProfile(name); generateProfileCards(); }); card.appendChild(deleteBtn); dom.profileGrid.appendChild(card); }); }
             
@@ -1352,25 +1368,6 @@
                 document.body.addEventListener('click', (e) => {
                     const target = e.target;
                     
-                    if (state.currentView === 'mainMenu') {
-                        if (konamiSequence.length === konamiCode.length && (target.id === 'stats-btn' || target.id === 'terminal-btn')) {
-                            konamiSequence.push(target.id);
-                            if (konamiSequence.slice(-2).join(',') === 'stats-btn,terminal-btn' && konamiSequence.slice(0, 8).join(',') === konamiCode.join(',')) {
-                                PALETTES['VAPORWAVE'] = { bg: '#0D0221', text: '#A9A3B6', accent: '#FF00C1', error: '#00F6FF' };
-                                if (!PALETTE_ORDER.includes('VAPORWAVE')) PALETTE_ORDER.push('VAPORWAVE');
-                                state.playerData.totalPoints += 10000;
-                                storage.savePlayerData(state.operatorName, state.playerData);
-                                applyPalette('VAPORWAVE');
-                                storage.savePalette('VAPORWAVE');
-                                dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints;
-                                konamiSequence = [];
-                                return; // Prevent navigation
-                            }
-                        } else if(target.id !== 'stats-btn' && target.id !== 'terminal-btn') {
-                            konamiSequence = [];
-                        }
-                    }
-
                     const isSettingsButton = target.closest('#settings-panel button');
                     if (target.id !== 'settings-button' && !isSettingsButton) { dom.settingsPanel.style.display = 'none'; }
                     audioManager.init();
@@ -1409,7 +1406,17 @@
                     if (state.currentView === 'mainMenu') {
                         if (konamiCode.includes(e.key)) {
                             konamiSequence.push(e.key);
-                            while (konamiSequence.length > 8) konamiSequence.shift();
+                            while (konamiSequence.length > konamiCode.length) konamiSequence.shift();
+                            if (konamiSequence.join(',') === konamiCode.join(',')) {
+                                PALETTES['VAPORWAVE'] = { bg: '#0D0221', text: '#A9A3B6', accent: '#FF00C1', error: '#00F6FF' };
+                                if (!PALETTE_ORDER.includes('VAPORWAVE')) PALETTE_ORDER.push('VAPORWAVE');
+                                state.playerData.totalPoints += 50000;
+                                storage.savePlayerData(state.operatorName, state.playerData);
+                                applyPalette('VAPORWAVE');
+                                storage.savePalette('VAPORWAVE');
+                                dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints;
+                                konamiSequence = [];
+                            }
                         } else {
                             konamiSequence = [];
                         }
