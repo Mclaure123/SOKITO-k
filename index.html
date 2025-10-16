@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>ANALYZER - v2.4.1 (Reactive Core)</title>
+    <title>ANALYZER - v2.3.2 (Storage Fix)</title>
     <style>
         :root {
             --color-background-primary: #08080A; --color-element-primary: #141414; --color-funckey-primary: #2A2A2A;
@@ -1351,6 +1351,26 @@
 
                 document.body.addEventListener('click', (e) => {
                     const target = e.target;
+                    
+                    if (state.currentView === 'mainMenu') {
+                        if (konamiSequence.length === konamiCode.length && (target.id === 'stats-btn' || target.id === 'terminal-btn')) {
+                            konamiSequence.push(target.id);
+                            if (konamiSequence.slice(-2).join(',') === 'stats-btn,terminal-btn' && konamiSequence.slice(0, 8).join(',') === konamiCode.join(',')) {
+                                PALETTES['VAPORWAVE'] = { bg: '#0D0221', text: '#A9A3B6', accent: '#FF00C1', error: '#00F6FF' };
+                                if (!PALETTE_ORDER.includes('VAPORWAVE')) PALETTE_ORDER.push('VAPORWAVE');
+                                state.playerData.totalPoints += 10000;
+                                storage.savePlayerData(state.operatorName, state.playerData);
+                                applyPalette('VAPORWAVE');
+                                storage.savePalette('VAPORWAVE');
+                                dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints;
+                                konamiSequence = [];
+                                return; // Prevent navigation
+                            }
+                        } else if(target.id !== 'stats-btn' && target.id !== 'terminal-btn') {
+                            konamiSequence = [];
+                        }
+                    }
+
                     const isSettingsButton = target.closest('#settings-panel button');
                     if (target.id !== 'settings-button' && !isSettingsButton) { dom.settingsPanel.style.display = 'none'; }
                     audioManager.init();
@@ -1389,17 +1409,7 @@
                     if (state.currentView === 'mainMenu') {
                         if (konamiCode.includes(e.key)) {
                             konamiSequence.push(e.key);
-                            while (konamiSequence.length > konamiCode.length) konamiSequence.shift();
-                            if (konamiSequence.join(',') === konamiCode.join(',')) {
-                                PALETTES['VAPORWAVE'] = { bg: '#0D0221', text: '#A9A3B6', accent: '#FF00C1', error: '#00F6FF' };
-                                if (!PALETTE_ORDER.includes('VAPORWAVE')) PALETTE_ORDER.push('VAPORWAVE');
-                                state.playerData.totalPoints += 10000;
-                                storage.savePlayerData(state.operatorName, state.playerData);
-                                applyPalette('VAPORWAVE');
-                                storage.savePalette('VAPORWAVE');
-                                dom.mainMenuTotalPoints.textContent = state.playerData.totalPoints;
-                                konamiSequence = [];
-                            }
+                            while (konamiSequence.length > 8) konamiSequence.shift();
                         } else {
                             konamiSequence = [];
                         }
